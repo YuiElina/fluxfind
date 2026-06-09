@@ -24,6 +24,11 @@ const FluxApp = (() => {
             initKey: 'togglefilterserversbutton',
             initDefault: true,
             pages: ['servers', 'game']
+        },
+        enhancements: {
+            module: FluxFeatureEnhancements,
+            initKey: null,
+            initDefault: true
         }
     };
 
@@ -57,6 +62,9 @@ const FluxApp = (() => {
 
         // Apply global features
         activateGlobalFeatures();
+
+        // Activate enhancements (handles all toggles internally)
+        activateFeature('enhancements', FEATURES.enhancements);
 
         FluxLogger.info('FluxFind initialized successfully');
         FluxNotifications.show('FluxFind ready', 'success', 2000);
