@@ -9,7 +9,7 @@
 const FluxModals = (() => {
     'use strict';
 
-    let activeModals = 0;
+    let activeModalCount = 0;
     let overlayEl = null;
 
     function _getOverlay() {
@@ -20,12 +20,22 @@ const FluxModals = (() => {
         return overlayEl;
     }
 
+    function _showOverlay() {
+        const overlay = _getOverlay();
+        if (!overlay.classList.contains('ff-modal-overlay-active')) {
+            overlay.classList.add('ff-modal-overlay-active');
+        }
+    }
+
+    function _hideOverlay() {
+        if (activeModalCount <= 0) {
+            const overlay = _getOverlay();
+            overlay.classList.remove('ff-modal-overlay-active');
+        }
+    }
+
     /**
      * Show a confirmation dialog
-     * @param {string} title
-     * @param {string} message
-     * @param {Object} options - { confirmText, cancelText, type, onConfirm, onCancel }
-     * @returns {Object} { close }
      */
     function confirm(title, message, options = {}) {
         const {
@@ -46,7 +56,12 @@ const FluxModals = (() => {
             success: FluxIcons.get('checkCircle', { size: 32, color: '#4CAF50' })
         };
 
-        const modal = FluxDOM.el('div', { className: 'ff-modal ff-modal-confirm ff-modal-pop' });
+        const modal = FluxDOM.el('div', {
+            className: 'ff-modal ff-modal-confirm ff-modal-pop',
+            style: { zIndex: '9999999' }
+        });
+        modal.style.setProperty('--ff-modal-z', '9999999');
+
         modal.innerHTML = `
             <div class="ff-modal-confirm-icon">${typeIcons[type] || typeIcons.info}</div>
             <h2 class="ff-modal-confirm-title">${safeTitle}</h2>
@@ -57,20 +72,19 @@ const FluxModals = (() => {
             </div>
         `;
 
-        _openOverlay();
+        _showOverlay();
         const overlay = _getOverlay();
         overlay.appendChild(modal);
-        overlay.style.display = 'flex';
+        activeModalCount++;
 
         function close() {
             modal.classList.remove('ff-modal-pop');
             modal.classList.add('ff-modal-closing');
             setTimeout(() => {
-                if (modal.isConnected) modal.remove();
-                activeModals--;
-                if (activeModals <= 0) {
-                    overlay.style.display = 'none';
-                    activeModals = 0;
+                if (modal.isConnected) {
+                    modal.remove();
+                    activeModalCount--;
+                    _hideOverlay();
                 }
             }, 200);
         }
@@ -83,19 +97,16 @@ const FluxModals = (() => {
             close();
             onCancel();
         });
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) { close(); onCancel(); }
-        });
 
-        activeModals++;
+        // Only close on overlay click if this is the only modal
+        overlay.addEventListener('click', function overlayHandler(e) {
+            if (e.target === overlay && activeModalCount <= 1) {
+                close();
+                onCancel();
+            }
+        }, { once: false });
 
         return { close };
-    }
-
-    function _openOverlay() {
-        const overlay = _getOverlay();
-        if (overlay.style.display === 'flex') overlay.style.display = 'none';
-        void overlay.offsetWidth;
     }
 
     /**
@@ -105,20 +116,18 @@ const FluxModals = (() => {
         const { closable = true, onClose = FluxUtils.noop, width = '600px' } = options;
 
         const modal = FluxDOM.el('div', {
-            className: 'ff-modal ff-modal-custom ff-modal-pop'
+            className: 'ff-modal ff-modal-custom ff-modal-pop',
+            style: { maxWidth: width, width: '95%' }
         });
-        modal.style.maxWidth = width;
-        modal.style.width = '95%';
 
         function close() {
             modal.classList.remove('ff-modal-pop');
             modal.classList.add('ff-modal-closing');
             setTimeout(() => {
-                if (modal.isConnected) modal.remove();
-                activeModals--;
-                if (activeModals <= 0) {
-                    _getOverlay().style.display = 'none';
-                    activeModals = 0;
+                if (modal.isConnected) {
+                    modal.remove();
+                    activeModalCount--;
+                    _hideOverlay();
                 }
                 onClose();
             }, 200);
@@ -126,14 +135,13 @@ const FluxModals = (() => {
 
         contentRenderer(modal, close);
 
-        _openOverlay();
+        _showOverlay();
         const overlay = _getOverlay();
         overlay.appendChild(modal);
-        overlay.style.display = 'flex';
-        activeModals++;
+        activeModalCount++;
 
         if (closable) {
-            overlay.addEventListener('click', (e) => {
+            overlay.addEventListener('click', function overlayHandler(e) {
                 if (e.target === overlay) close();
             });
         }
