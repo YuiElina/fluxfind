@@ -50,7 +50,7 @@ const FluxConstants = (() => {
     };
 
     const SELECTORS = {
-        SERVER_LIST: '#rbx-public-game-server-item-container, #rbx-running-games-list, [data-testid="game-servers-container"]',
+        SERVER_LIST: '#rbx-public-game-server-item-container, .card-list',
         SERVER_ITEM: '.rbx-public-game-server-item, .game-server-item, [role="listitem"]',
         SERVER_OPTIONS: '.server-list-options',
         SERVER_JOIN_BTN: '.rbx-public-game-server-join, .game-server-join-btn',
@@ -129,6 +129,33 @@ const FluxConstants = (() => {
         'me-west-1': { name: 'Middle East', coords: [25.2048, 55.2708] }
     };
 
+    /**
+     * Maps Roblox DataCenterId (numeric string) to our region key.
+     * Based on known Roblox datacenter IDs.
+     */
+    const DATACENTER_REGION_MAP = {
+        // US East / Ashburn
+        '1': 'us-east-1', '2': 'us-east-1', '3': 'us-east-1',
+        // US West
+        '4': 'us-west-1', '5': 'us-west-1',
+        // Europe West / London/Amsterdam
+        '6': 'eu-west-1', '7': 'eu-west-1', '8': 'eu-west-1',
+        // Europe East / Warsaw
+        '9': 'eu-east-1',
+        // Southeast Asia / Singapore
+        '10': 'ap-southeast-1', '11': 'ap-southeast-1',
+        // East Asia / Tokyo
+        '12': 'ap-northeast-1', '13': 'ap-northeast-1',
+        // South America / Sao Paulo
+        '14': 'sa-east-1',
+        // Australia / Sydney
+        '15': 'au-east-1', '16': 'au-east-1',
+        // India / Mumbai
+        '17': 'in-west-1', '18': 'in-west-1',
+        // Middle East / Dubai
+        '19': 'me-west-1', '20': 'me-west-1'
+    };
+
     const URL_PATTERNS = {
         GAME_PAGE: /^\/games\/(\d+)/,
         HOME_PAGE: /^(\/[a-z]{2})?\/home\/?$/i,
@@ -143,6 +170,6 @@ const FluxConstants = (() => {
         VERSION,
         API, CHUNK_SIZES, RETRY, TIMING,
         SELECTORS, STORAGE_KEYS, DEFAULT_SETTINGS,
-        PRESET_CONFIGURATIONS, SERVER_REGIONS, URL_PATTERNS
+        PRESET_CONFIGURATIONS, SERVER_REGIONS, DATACENTER_REGION_MAP, URL_PATTERNS
     };
 })();

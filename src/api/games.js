@@ -173,13 +173,40 @@ const FluxGamesAPI = (() => {
     }
 
     /**
-     * Get server details for a game
+     * Get server details for a game (returns DataCenterId in joinScript)
      */
     async function getServerDetails(gameId, jobId) {
         const url = `${FluxConstants.API.ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${jobId}`;
         const response = await fetch(url, { credentials: 'include' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
+    }
+
+    /**
+     * Batch-fetch DataCenterIds for multiple server job IDs.
+     * Returns Map<jobId, regionKey> using DATACENTER_REGION_MAP.
+     */
+    async function fetchServerRegions(gameId, jobIds) {
+        if (!jobIds || !jobIds.length) return new Map();
+        const results = new Map();
+
+        // Fetch in parallel with concurrency limit of 4 to avoid rate limits
+        const tasks = jobIds.map(jobId => async () => {
+            try {
+                const data = await getServerDetails(gameId, jobId);
+                const dcId = String(data?.joinScript?.DataCenterId || '');
+                if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
+                    const regionKey = FluxConstants.DATACENTER_REGION_MAP[dcId];
+                    results.set(jobId, regionKey);
+                }
+            } catch (e) {
+                FluxLogger.info('Server region fetch failed for jobId ' + jobId);
+            }
+        });
+
+        await FluxUtils.parallelLimit(tasks, 4);
+        FluxLogger.info('Fetched regions for ' + results.size + '/' + jobIds.length + ' servers');
+        return results;
     }
 
     /**
@@ -206,6 +233,7 @@ const FluxGamesAPI = (() => {
         getFavoriteGames,
         joinServer,
         getServerDetails,
+        fetchServerRegions,
         getUserPresence
     };
 })();
