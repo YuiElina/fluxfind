@@ -1,6 +1,6 @@
 /**
- * FluxFind Games API Module
- * Game/Universe data fetching with batch support, caching, and vote aggregation
+ * FluxFind Games API
+ * Game/universe data fetching with batch support, caching, vote aggregation, and DataCenterId lookup.
  *
  * @module api/games
  * @license GPL-2.0-only
@@ -9,231 +9,161 @@
 const FluxGamesAPI = (() => {
     'use strict';
 
-    const { GAMES_API, THUMBNAILS_API } = FluxConstants.API;
+    const { GAMES_API, THUMBNAILS_API, ROBLOX_BASE } = FluxConstants.API;
     const { GAME_ICONS, GAME_VOTES } = FluxConstants.CHUNK_SIZES;
 
-    /**
-     * Get current game ID from URL
-     */
     function getCurrentGameId() {
         const match = window.location.href.match(/\/games\/(\d+)/);
         return match ? FluxSanitizer.sanitizeUserId(match[1]) : 0;
     }
 
-    /**
-     * Get universe ID from place ID
-     */
     async function getUniverseId(placeId) {
         const safeId = FluxSanitizer.sanitizeUserId(placeId);
         if (!safeId) throw new Error('Invalid place ID');
-
         const data = await FluxHttpClient.get(
             `${GAMES_API}/games/multiget-place-details`,
             { placeIds: safeId },
             { cache: true }
         );
-
         if (Array.isArray(data) && data.length > 0 && data[0].universeId) {
-            FluxLogger.debug(`Universe ID for place ${safeId}: ${data[0].universeId}`);
+            FluxLogger.debug('Universe ID for place ' + safeId + ': ' + data[0].universeId);
             return data[0].universeId;
         }
         throw new Error('Universe ID not found');
     }
 
-    /**
-     * Get game icons (thumbnails) for universe IDs
-     * Supports both single ID and array of IDs
-     */
     function getGameIcons(universeIds) {
         const single = !Array.isArray(universeIds);
         const ids = single ? [universeIds] : universeIds;
         const chunks = FluxUtils.chunk(ids, GAME_ICONS);
 
-        const chunkPromises = chunks.map(chunk => {
-            const url = `${THUMBNAILS_API}/games/icons`;
-            return FluxHttpClient.get(url, {
+        const chunkPromises = chunks.map(chunk =>
+            FluxHttpClient.get(`${THUMBNAILS_API}/games/icons`, {
                 universeIds: chunk.join(','),
-                size: '512x512',
-                format: 'Png',
-                isCircular: 'false',
-                returnPolicy: 'PlaceHolder'
-            }, { cache: true }).then(r => r.data || []);
-        });
+                size: '512x512', format: 'Png', isCircular: 'false', returnPolicy: 'PlaceHolder'
+            }, { cache: true }).then(r => r.data || [])
+        );
 
         return Promise.all(chunkPromises).then(results => {
             const combined = results.flat();
             if (combined.length === 0) throw new Error('No icon data returned');
-
             if (single) {
                 const item = combined.find(d => String(d.targetId) === String(universeIds));
                 return item ? item.imageUrl : null;
             }
-
             const map = {};
-            combined.forEach(item => {
-                if (item.imageUrl) map[item.targetId] = item.imageUrl;
-            });
+            combined.forEach(item => { if (item.imageUrl) map[item.targetId] = item.imageUrl; });
             return map;
         });
     }
 
-    /**
-     * Get game details (name, description, playing, visits, etc.)
-     * Accepts single ID or array
-     */
     async function getGameDetails(universeIds) {
         const single = !Array.isArray(universeIds);
         const ids = single ? [universeIds] : universeIds;
-
         const data = await FluxHttpClient.get(
             `${GAMES_API}/games`,
             { universeIds: ids.join(',') },
             { cache: true }
         );
-
-        if (single) {
-            return (data.data && data.data.length > 0) ? data.data[0] : null;
-        }
-
+        if (single) return (data.data && data.data.length > 0) ? data.data[0] : null;
         const map = {};
-        if (data.data) {
-            data.data.forEach(game => { map[game.id] = game; });
-        }
+        if (data.data) data.data.forEach(game => { map[game.id] = game; });
         return map;
     }
 
-    /**
-     * Get up/down votes for universe IDs
-     */
     function getGameVotes(universeIds) {
         const single = !Array.isArray(universeIds);
         const ids = single ? [universeIds] : universeIds;
         const chunks = FluxUtils.chunk(ids, GAME_VOTES);
-
-        const chunkPromises = chunks.map(chunk => {
-            return FluxHttpClient.get(
-                `${GAMES_API}/games/votes`,
+        const chunkPromises = chunks.map(chunk =>
+            FluxHttpClient.get(`${GAMES_API}/games/votes`,
                 { universeIds: chunk.join(',') },
                 { cache: true }
-            ).then(r => r.data || []);
-        });
-
+            ).then(r => r.data || [])
+        );
         return Promise.all(chunkPromises).then(results => {
             const combined = results.flat();
             if (combined.length === 0) throw new Error('No vote data');
-
             if (single) {
                 const item = combined.find(d => String(d.id) === String(universeIds));
                 return item ? { upVotes: item.upVotes, downVotes: item.downVotes } : null;
             }
-
             const map = {};
-            combined.forEach(item => {
-                map[item.id] = { upVotes: item.upVotes, downVotes: item.downVotes };
-            });
+            combined.forEach(item => { map[item.id] = { upVotes: item.upVotes, downVotes: item.downVotes }; });
             return map;
         });
     }
 
-    /**
-     * Get favorite games for a user
-     */
     async function getFavoriteGames(userId) {
         const safeId = FluxSanitizer.sanitizeUserId(userId);
         if (!safeId) return [];
-
         const data = await FluxHttpClient.get(
-            `${GAMES_API}/users/${safeId}/favorite/games`,
-            {},
-            { cache: true }
+            `${GAMES_API}/users/${safeId}/favorite/games`, {}, { cache: true }
         );
         return data.data || [];
     }
 
-    /**
-     * Join a game server
-     */
     async function joinServer(placeId, serverId) {
         const csrfToken = FluxDOM.getCsrfToken();
         if (!csrfToken) throw new Error('No CSRF token available');
-
         return FluxHttpClient.post(
             `${FluxConstants.API.JOIN_API}/join`,
-            {
-                placeId: FluxSanitizer.sanitizeUserId(placeId),
-                gameId: serverId
-            },
-            {
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Content-Type': 'application/json'
-                }
-            }
+            { placeId: FluxSanitizer.sanitizeUserId(placeId), gameId: serverId },
+            { headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json' } }
         );
     }
 
     /**
-     * Get server details for a game (returns DataCenterId in joinScript)
+     * Get server details including DataCenterId.
+     * Returns null for full/private servers (HTTP 404 — no join script available).
      */
     async function getServerDetails(gameId, jobId) {
-        const url = `${FluxConstants.API.ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${jobId}`;
+        const url = `${ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${jobId}`;
         const response = await fetch(url, { credentials: 'include' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
+        if (!response.ok) return null; // 404 = full server, 403 = private — both expected
+        const data = await response.json();
+        return data;
     }
 
     /**
-     * Batch-fetch DataCenterIds for multiple server job IDs.
-     * Returns Map<jobId, regionKey> using DATACENTER_REGION_MAP.
+     * Batch-fetch DataCenterIds. Skips full servers silently (they return 404).
+     * Returns Map<jobId, regionKey>.
      */
     async function fetchServerRegions(gameId, jobIds) {
         if (!jobIds || !jobIds.length) return new Map();
         const results = new Map();
+        let attempted = 0, succeeded = 0, full = 0;
 
-        // Fetch in parallel with concurrency limit of 4 to avoid rate limits
         const tasks = jobIds.map(jobId => async () => {
+            attempted++;
             try {
                 const data = await getServerDetails(gameId, jobId);
+                if (!data) { full++; return; }
                 const dcId = String(data?.joinScript?.DataCenterId || '');
                 if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
-                    const regionKey = FluxConstants.DATACENTER_REGION_MAP[dcId];
-                    results.set(jobId, regionKey);
+                    results.set(jobId, FluxConstants.DATACENTER_REGION_MAP[dcId]);
+                    succeeded++;
                 }
-            } catch (e) {
-                FluxLogger.info('Server region fetch failed for jobId ' + jobId);
-            }
+            } catch { full++; }
         });
 
         await FluxUtils.parallelLimit(tasks, 4);
-        FluxLogger.info('Fetched regions for ' + results.size + '/' + jobIds.length + ' servers');
+        FluxLogger.info(`Regions: ${succeeded} found, ${full} full/private, ${attempted} total`);
         return results;
     }
 
-    /**
-     * Get a user's presence (online status, last location)
-     */
     async function getUserPresence(userId) {
         const safeId = FluxSanitizer.sanitizeUserId(userId);
         if (!safeId) return null;
-
         const data = await FluxHttpClient.post(
             `${FluxConstants.API.PRESENCE_API}/presence/users`,
-            { userIds: [safeId] },
-            { cache: false }
+            { userIds: [safeId] }, { cache: false }
         );
         return data.userPresences?.[0] || null;
     }
 
     return {
-        getCurrentGameId,
-        getUniverseId,
-        getGameIcons,
-        getGameDetails,
-        getGameVotes,
-        getFavoriteGames,
-        joinServer,
-        getServerDetails,
-        fetchServerRegions,
-        getUserPresence
+        getCurrentGameId, getUniverseId, getGameIcons, getGameDetails, getGameVotes,
+        getFavoriteGames, joinServer, getServerDetails, fetchServerRegions, getUserPresence
     };
 })();

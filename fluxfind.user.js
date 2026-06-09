@@ -1308,8 +1308,8 @@ const FluxHttpClient = (() => {
 
 // ====== MODULE: games (src/api/games.js) ======
 /**
- * FluxFind Games API Module
- * Game/Universe data fetching with batch support, caching, and vote aggregation
+ * FluxFind Games API
+ * Game/universe data fetching with batch support, caching, vote aggregation, and DataCenterId lookup.
  *
  * @module api/games
  * @license GPL-2.0-only
@@ -1318,232 +1318,162 @@ const FluxHttpClient = (() => {
 const FluxGamesAPI = (() => {
     'use strict';
 
-    const { GAMES_API, THUMBNAILS_API } = FluxConstants.API;
+    const { GAMES_API, THUMBNAILS_API, ROBLOX_BASE } = FluxConstants.API;
     const { GAME_ICONS, GAME_VOTES } = FluxConstants.CHUNK_SIZES;
 
-    /**
-     * Get current game ID from URL
-     */
     function getCurrentGameId() {
         const match = window.location.href.match(/\/games\/(\d+)/);
         return match ? FluxSanitizer.sanitizeUserId(match[1]) : 0;
     }
 
-    /**
-     * Get universe ID from place ID
-     */
     async function getUniverseId(placeId) {
         const safeId = FluxSanitizer.sanitizeUserId(placeId);
         if (!safeId) throw new Error('Invalid place ID');
-
         const data = await FluxHttpClient.get(
             `${GAMES_API}/games/multiget-place-details`,
             { placeIds: safeId },
             { cache: true }
         );
-
         if (Array.isArray(data) && data.length > 0 && data[0].universeId) {
-            FluxLogger.debug(`Universe ID for place ${safeId}: ${data[0].universeId}`);
+            FluxLogger.debug('Universe ID for place ' + safeId + ': ' + data[0].universeId);
             return data[0].universeId;
         }
         throw new Error('Universe ID not found');
     }
 
-    /**
-     * Get game icons (thumbnails) for universe IDs
-     * Supports both single ID and array of IDs
-     */
     function getGameIcons(universeIds) {
         const single = !Array.isArray(universeIds);
         const ids = single ? [universeIds] : universeIds;
         const chunks = FluxUtils.chunk(ids, GAME_ICONS);
 
-        const chunkPromises = chunks.map(chunk => {
-            const url = `${THUMBNAILS_API}/games/icons`;
-            return FluxHttpClient.get(url, {
+        const chunkPromises = chunks.map(chunk =>
+            FluxHttpClient.get(`${THUMBNAILS_API}/games/icons`, {
                 universeIds: chunk.join(','),
-                size: '512x512',
-                format: 'Png',
-                isCircular: 'false',
-                returnPolicy: 'PlaceHolder'
-            }, { cache: true }).then(r => r.data || []);
-        });
+                size: '512x512', format: 'Png', isCircular: 'false', returnPolicy: 'PlaceHolder'
+            }, { cache: true }).then(r => r.data || [])
+        );
 
         return Promise.all(chunkPromises).then(results => {
             const combined = results.flat();
             if (combined.length === 0) throw new Error('No icon data returned');
-
             if (single) {
                 const item = combined.find(d => String(d.targetId) === String(universeIds));
                 return item ? item.imageUrl : null;
             }
-
             const map = {};
-            combined.forEach(item => {
-                if (item.imageUrl) map[item.targetId] = item.imageUrl;
-            });
+            combined.forEach(item => { if (item.imageUrl) map[item.targetId] = item.imageUrl; });
             return map;
         });
     }
 
-    /**
-     * Get game details (name, description, playing, visits, etc.)
-     * Accepts single ID or array
-     */
     async function getGameDetails(universeIds) {
         const single = !Array.isArray(universeIds);
         const ids = single ? [universeIds] : universeIds;
-
         const data = await FluxHttpClient.get(
             `${GAMES_API}/games`,
             { universeIds: ids.join(',') },
             { cache: true }
         );
-
-        if (single) {
-            return (data.data && data.data.length > 0) ? data.data[0] : null;
-        }
-
+        if (single) return (data.data && data.data.length > 0) ? data.data[0] : null;
         const map = {};
-        if (data.data) {
-            data.data.forEach(game => { map[game.id] = game; });
-        }
+        if (data.data) data.data.forEach(game => { map[game.id] = game; });
         return map;
     }
 
-    /**
-     * Get up/down votes for universe IDs
-     */
     function getGameVotes(universeIds) {
         const single = !Array.isArray(universeIds);
         const ids = single ? [universeIds] : universeIds;
         const chunks = FluxUtils.chunk(ids, GAME_VOTES);
-
-        const chunkPromises = chunks.map(chunk => {
-            return FluxHttpClient.get(
-                `${GAMES_API}/games/votes`,
+        const chunkPromises = chunks.map(chunk =>
+            FluxHttpClient.get(`${GAMES_API}/games/votes`,
                 { universeIds: chunk.join(',') },
                 { cache: true }
-            ).then(r => r.data || []);
-        });
-
+            ).then(r => r.data || [])
+        );
         return Promise.all(chunkPromises).then(results => {
             const combined = results.flat();
             if (combined.length === 0) throw new Error('No vote data');
-
             if (single) {
                 const item = combined.find(d => String(d.id) === String(universeIds));
                 return item ? { upVotes: item.upVotes, downVotes: item.downVotes } : null;
             }
-
             const map = {};
-            combined.forEach(item => {
-                map[item.id] = { upVotes: item.upVotes, downVotes: item.downVotes };
-            });
+            combined.forEach(item => { map[item.id] = { upVotes: item.upVotes, downVotes: item.downVotes }; });
             return map;
         });
     }
 
-    /**
-     * Get favorite games for a user
-     */
     async function getFavoriteGames(userId) {
         const safeId = FluxSanitizer.sanitizeUserId(userId);
         if (!safeId) return [];
-
         const data = await FluxHttpClient.get(
-            `${GAMES_API}/users/${safeId}/favorite/games`,
-            {},
-            { cache: true }
+            `${GAMES_API}/users/${safeId}/favorite/games`, {}, { cache: true }
         );
         return data.data || [];
     }
 
-    /**
-     * Join a game server
-     */
     async function joinServer(placeId, serverId) {
         const csrfToken = FluxDOM.getCsrfToken();
         if (!csrfToken) throw new Error('No CSRF token available');
-
         return FluxHttpClient.post(
             `${FluxConstants.API.JOIN_API}/join`,
-            {
-                placeId: FluxSanitizer.sanitizeUserId(placeId),
-                gameId: serverId
-            },
-            {
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Content-Type': 'application/json'
-                }
-            }
+            { placeId: FluxSanitizer.sanitizeUserId(placeId), gameId: serverId },
+            { headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json' } }
         );
     }
 
     /**
-     * Get server details for a game (returns DataCenterId in joinScript)
+     * Get server details including DataCenterId.
+     * Returns null for full/private servers (HTTP 404 — no join script available).
      */
     async function getServerDetails(gameId, jobId) {
-        const url = `${FluxConstants.API.ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${jobId}`;
+        const url = `${ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${jobId}`;
         const response = await fetch(url, { credentials: 'include' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
+        if (!response.ok) return null; // 404 = full server, 403 = private — both expected
+        const data = await response.json();
+        return data;
     }
 
     /**
-     * Batch-fetch DataCenterIds for multiple server job IDs.
-     * Returns Map<jobId, regionKey> using DATACENTER_REGION_MAP.
+     * Batch-fetch DataCenterIds. Skips full servers silently (they return 404).
+     * Returns Map<jobId, regionKey>.
      */
     async function fetchServerRegions(gameId, jobIds) {
         if (!jobIds || !jobIds.length) return new Map();
         const results = new Map();
+        let attempted = 0, succeeded = 0, full = 0;
 
-        // Fetch in parallel with concurrency limit of 4 to avoid rate limits
         const tasks = jobIds.map(jobId => async () => {
+            attempted++;
             try {
                 const data = await getServerDetails(gameId, jobId);
+                if (!data) { full++; return; }
                 const dcId = String(data?.joinScript?.DataCenterId || '');
                 if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
-                    const regionKey = FluxConstants.DATACENTER_REGION_MAP[dcId];
-                    results.set(jobId, regionKey);
+                    results.set(jobId, FluxConstants.DATACENTER_REGION_MAP[dcId]);
+                    succeeded++;
                 }
-            } catch (e) {
-                FluxLogger.info('Server region fetch failed for jobId ' + jobId);
-            }
+            } catch { full++; }
         });
 
         await FluxUtils.parallelLimit(tasks, 4);
-        FluxLogger.info('Fetched regions for ' + results.size + '/' + jobIds.length + ' servers');
+        FluxLogger.info(`Regions: ${succeeded} found, ${full} full/private, ${attempted} total`);
         return results;
     }
 
-    /**
-     * Get a user's presence (online status, last location)
-     */
     async function getUserPresence(userId) {
         const safeId = FluxSanitizer.sanitizeUserId(userId);
         if (!safeId) return null;
-
         const data = await FluxHttpClient.post(
             `${FluxConstants.API.PRESENCE_API}/presence/users`,
-            { userIds: [safeId] },
-            { cache: false }
+            { userIds: [safeId] }, { cache: false }
         );
         return data.userPresences?.[0] || null;
     }
 
     return {
-        getCurrentGameId,
-        getUniverseId,
-        getGameIcons,
-        getGameDetails,
-        getGameVotes,
-        getFavoriteGames,
-        joinServer,
-        getServerDetails,
-        fetchServerRegions,
-        getUserPresence
+        getCurrentGameId, getUniverseId, getGameIcons, getGameDetails, getGameVotes,
+        getFavoriteGames, joinServer, getServerDetails, fetchServerRegions, getUserPresence
     };
 })();
 
@@ -2927,8 +2857,8 @@ const FluxRouter = (() => {
 // ====== MODULE: server-browser (src/features/server-browser.js) ======
 /**
  * FluxFind Server Browser Feature
- * Uses FluxUtils.watchForChild to wait for server list, then fetches DataCenterIds
- * from Roblox API for accurate region detection (not text matching).
+ * Single-fire initialization: once server DOM is detected, inject controls and scan regions.
+ * Does NOT retry endlessly — uses watchForChild once, then MutationObserver for future changes.
  *
  * @module features/server-browser
  * @license GPL-2.0-only
@@ -2936,89 +2866,31 @@ const FluxRouter = (() => {
 const FluxFeatureServerBrowser = (() => {
     'use strict';
 
-    let enabled = false, filterButtonAdded = false, serverCardsEnhanced = false, serverObserver = null;
-    let regionCache = new Map(); // jobId -> regionKey cache
+    let loaded = false;   // whether we've fully initialized once
+    let serverObserver = null;
+    let regionCache = new Map();
     let currentGameId = 0;
+    let regionScanDone = false; // prevent re-scanning on every observer trigger
 
-    /* ====== Extract jobId from server item ====== */
     function getJobId(item) {
-        const serverIdEl = item.querySelector('.server-id-text, [class*="server-id"]');
-        if (serverIdEl) {
-            const match = serverIdEl.textContent.match(/ID:\s*(\S+)/);
-            if (match) return match[1];
-        }
-        // Fallback: extract from any text containing a server ID pattern
-        const text = item.textContent;
-        const altMatch = text.match(/ID:\s*([a-f0-9]{4}-[a-f0-9]{4})/i);
-        return altMatch ? altMatch[1] : null;
+        const sid = item.querySelector('.server-id-text, [class*="server-id"]');
+        if (sid) { const m = sid.textContent.match(/ID:\s*(\S+)/); if (m) return m[1]; }
+        const m2 = item.textContent.match(/ID:\s*([a-f0-9]{4}-[a-f0-9]{4})/i);
+        return m2 ? m2[1] : null;
     }
 
-    async function _waitForContainer() {
-        try {
-            const el = await FluxUtils.watchForChild(
-                '#game-instances, .tab-content, [class*="game-instances"]',
-                '#rbx-public-game-server-item-container, .card-list',
-                30000
-            );
-            FluxLogger.info('Server container found via watchForChild');
-            return el;
-        } catch (e) {
-            FluxLogger.info('Server container not found');
-            return null;
-        }
-    }
-
-    /* ====== Inject Controls ====== */
-    async function injectFilterButtons() {
-        if (filterButtonAdded) return;
-        const container = await _waitForContainer();
-        if (!container) return;
-
-        currentGameId = FluxGamesAPI.getCurrentGameId();
-        if (!currentGameId) {
-            FluxLogger.info('Could not detect game ID for server region scanning');
-            return;
-        }
-
-        const old = document.querySelector('.ff-server-controls');
-        if (old) old.remove();
-
-        const btnContainer = FluxDOM.el('div', { className: 'ff-server-controls' });
-
-        const refreshBtn = FluxDOM.el('button', { className: 'ff-btn ff-btn-sm',
-            onclick: () => refreshServers() });
-        refreshBtn.innerHTML = FluxIcons.get('refresh', { size: 14 }) + ' Refresh';
-
-        const filterBtn = FluxDOM.el('button', { className: 'ff-btn ff-btn-sm',
-            onclick: () => openFilterPanel() });
-        filterBtn.innerHTML = FluxIcons.get('filter', { size: 14 }) + ' Filters';
-
-        const quickJoinBtn = FluxDOM.el('button', {
-            className: 'ff-btn ff-btn-sm ff-btn-primary',
-            onclick: () => quickJoinRandom()
-        });
-        quickJoinBtn.innerHTML = FluxIcons.get('zap', { size: 14 }) + ' Quick Join';
-
-        FluxUtils.batchAppend(btnContainer, [refreshBtn, filterBtn, quickJoinBtn]);
-        container.parentNode.insertBefore(btnContainer, container);
-        filterButtonAdded = true;
-        FluxLogger.info('Server controls injected (game ID: ' + currentGameId + ')');
-
-        // Auto-scan regions
-        scanAndCacheRegions();
-    }
-
-    /** Fetch all server DataCenterIds and cache them */
+    /* ====== Region Scanning ====== */
     async function scanAndCacheRegions() {
+        if (regionScanDone) return;
         const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
         const jobIds = [];
         items.forEach(item => {
             const jid = getJobId(item);
             if (jid && !regionCache.has(jid)) jobIds.push(jid);
         });
-
         if (!jobIds.length) {
-            FluxLogger.info('No job IDs found to scan');
+            FluxLogger.info('No server job IDs found on this page');
+            regionScanDone = true;
             return;
         }
 
@@ -3028,157 +2900,175 @@ const FluxFeatureServerBrowser = (() => {
         try {
             const newRegions = await FluxGamesAPI.fetchServerRegions(currentGameId, jobIds);
             newRegions.forEach((region, jobId) => regionCache.set(jobId, region));
-            FluxLogger.info('Region scan complete: ' + regionCache.size + ' cached');
+            regionScanDone = true;
+            FluxLogger.info('Region scan complete: ' + regionCache.size + '/' + jobIds.length + ' identified');
 
-            // Apply saved region filter if any
+            // Update cards to show region badges
+            updateRegionBadges();
+
+            // If we found regions, auto-apply saved filter
             const savedRegion = FluxStorage.get('serverregionfilter');
-            if (savedRegion) {
+            if (savedRegion && regionCache.size > 0) {
                 applyRegionFilter(savedRegion);
             }
         } catch (e) {
-            FluxLogger.info('Region scan failed: ' + e.message);
+            regionScanDone = true;
+            FluxLogger.info('Region scan error: ' + e.message);
         }
+    }
+
+    function updateRegionBadges() {
+        document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM).forEach(item => {
+            // Remove existing region badge
+            const existing = item.querySelector('.ff-region-badge');
+            if (existing) existing.remove();
+
+            const jid = getJobId(item);
+            if (jid && regionCache.has(jid)) {
+                const rk = regionCache.get(jid);
+                const rn = FluxConstants.SERVER_REGIONS[rk]?.name || rk;
+                const rb = FluxDOM.el('span', {
+                    className: 'ff-tag ff-tag-purple ff-region-badge',
+                    style: 'margin-left:4px'
+                });
+                rb.textContent = rn;
+                const dd = item.querySelector('.game-server-details, [class*="server-details"]');
+                if (dd) dd.appendChild(rb);
+            }
+        });
     }
 
     function applyRegionFilter(regionCode) {
         FluxStorage.set('serverregionfilter', regionCode);
-        const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
-        let hidden = 0;
-        let visible = 0;
-
-        items.forEach(item => {
-            const jid = getJobId(item);
-            const region = jid ? regionCache.get(jid) : null;
-            if (!regionCode) {
-                item.style.display = '';
-                visible++;
-            } else if (region === regionCode) {
-                item.style.display = '';
-                visible++;
-            } else {
-                item.style.display = 'none';
-                hidden++;
-            }
-        });
-
-        if (!regionCode) {
-            FluxNotifications.show('All regions: ' + visible + ' servers', 'info', 2000);
-        } else {
-            const regionName = FluxConstants.SERVER_REGIONS[regionCode]?.name || regionCode;
-            FluxNotifications.show(regionName + ': ' + visible + ' servers shown, ' + hidden + ' hidden', 'info', 3000);
-        }
-    }
-
-    /* ====== Enhance Cards ====== */
-    async function enhanceServerCards() {
-        if (serverCardsEnhanced) return;
-
-        try {
-            await FluxUtils.watchForChild(
-                '#rbx-public-game-server-item-container',
-                '.rbx-public-game-server-item',
-                15000
-            );
-        } catch (e) {
+        if (!regionCode || regionCache.size === 0) {
+            // Show all — clear any hidden state
+            document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM).forEach(i => { i.style.display = ''; });
             return;
         }
+        let visible = 0, hidden = 0;
+        document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM).forEach(item => {
+            const jid = getJobId(item);
+            const region = jid ? regionCache.get(jid) : null;
+            if (region === regionCode) { item.style.display = ''; visible++; }
+            else { item.style.display = 'none'; hidden++; }
+        });
+        const name = FluxConstants.SERVER_REGIONS[regionCode]?.name || regionCode;
+        FluxNotifications.show(name + ': ' + visible + ' servers', 'info', 3000);
+    }
 
+    /* ====== Controls ====== */
+    function injectFilterButtons() {
+        const container = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
+        if (!container) return;
+
+        // Remove any existing controls
+        const old = document.querySelector('.ff-server-controls');
+        if (old) old.remove();
+
+        const bar = FluxDOM.el('div', { className: 'ff-server-controls' });
+
+        const rBtn = FluxDOM.el('button', { className: 'ff-btn ff-btn-sm', onclick: () => refreshServers() });
+        rBtn.innerHTML = FluxIcons.get('refresh', { size: 14 }) + ' Refresh';
+
+        const fBtn = FluxDOM.el('button', { className: 'ff-btn ff-btn-sm', onclick: () => openFilterPanel() });
+        fBtn.innerHTML = FluxIcons.get('filter', { size: 14 }) + ' Filters';
+
+        const qBtn = FluxDOM.el('button', { className: 'ff-btn ff-btn-sm ff-btn-primary', onclick: () => quickJoinRandom() });
+        qBtn.innerHTML = FluxIcons.get('zap', { size: 14 }) + ' Quick Join';
+
+        FluxUtils.batchAppend(bar, [rBtn, fBtn, qBtn]);
+        container.parentNode.insertBefore(bar, container);
+        FluxLogger.info('Server controls injected (game: ' + currentGameId + ')');
+    }
+
+    /* ====== Card Enhancement ====== */
+    function enhanceServerCards() {
         const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
-        if (!items.length) return;
-
         items.forEach(item => {
             if (item.dataset.ffEnhanced) return;
             item.dataset.ffEnhanced = '1';
 
-            const joinBtn = item.querySelector(FluxConstants.SELECTORS.SERVER_JOIN_BTN);
-            if (joinBtn) {
-                joinBtn.classList.add('ff-btn', 'ff-btn-sm', 'ff-btn-primary');
-            }
+            const jb = item.querySelector(FluxConstants.SELECTORS.SERVER_JOIN_BTN);
+            if (jb) jb.classList.add('ff-btn', 'ff-btn-sm', 'ff-btn-primary');
 
-            const statusEl = item.querySelector(FluxConstants.SELECTORS.SERVER_STATUS);
-            if (statusEl) {
-                const match = statusEl.textContent.match(/(\d+)\s*(?:of|\/)\s*(\d+)/);
-                if (match) {
-                    const cur = parseInt(match[1]), max = parseInt(match[2]);
-                    const badge = FluxDOM.el('span', {
-                        className: 'ff-tag ' + (cur >= max ? 'ff-tag-red' : 'ff-tag-green')
+            const se = item.querySelector(FluxConstants.SELECTORS.SERVER_STATUS);
+            if (se) {
+                const m = se.textContent.match(/(\d+)\s*(?:of|\/)\s*(\d+)/);
+                if (m) {
+                    // Remove old badge if exists
+                    const oldBadge = item.querySelector('.ff-player-badge');
+                    if (oldBadge) oldBadge.remove();
+                    const b = FluxDOM.el('span', {
+                        className: 'ff-tag ff-player-badge ' + (+m[1] >= +m[2] ? 'ff-tag-red' : 'ff-tag-green')
                     });
-                    badge.textContent = cur + '/' + max;
-                    statusEl.parentNode.insertBefore(badge, statusEl.nextSibling);
+                    b.textContent = m[1] + '/' + m[2];
+                    se.parentNode.insertBefore(b, se.nextSibling);
                 }
             }
-
-            // Show region badge if cached
-            const jid = getJobId(item);
-            if (jid && regionCache.has(jid)) {
-                const rk = regionCache.get(jid);
-                const rname = FluxConstants.SERVER_REGIONS[rk]?.name || rk;
-                const regionBadge = FluxDOM.el('span', {
-                    className: 'ff-tag ff-tag-purple',
-                    style: 'margin-left:4px'
-                });
-                regionBadge.textContent = rname;
-                const details = item.querySelector('.game-server-details, [class*="server-details"]');
-                if (details) details.appendChild(regionBadge);
-            }
         });
-        serverCardsEnhanced = true;
         FluxLogger.info('Enhanced ' + items.length + ' server cards');
     }
 
     function refreshServers() {
-        FluxNotifications.show('Refreshing servers...', 'info', 2000);
-        const native = document.querySelector('[data-testid="game-servers-refresh-button"], .rbx-refresh');
-        if (native) native.click();
-        serverCardsEnhanced = false;
+        FluxNotifications.show('Refreshing...', 'info', 2000);
+        const nb = document.querySelector('[data-testid="game-servers-refresh-button"], .rbx-refresh');
+        if (nb) nb.click();
+        // Reset flags so cards re-enhance when new servers load
         regionCache.clear();
-        setTimeout(async () => {
-            await enhanceServerCards();
-            await scanAndCacheRegions();
+        regionScanDone = false;
+        setTimeout(() => {
+            enhanceServerCards();
+            scanAndCacheRegions();
         }, 1500);
     }
 
-    /* ====== Filter Panel ====== */
     function openFilterPanel() {
         FluxModals.custom((modal, close) => {
-            const regionOpts = Object.entries(FluxConstants.SERVER_REGIONS)
-                .map(([key, r]) => '<button class="ff-btn ff-btn-sm ff-region-filter-btn" data-region="' + key + '">' + r.name + '</button>')
-                .join('');
+            const regionBtns = '<button class="ff-btn ff-btn-sm ff-region-btn ff-active" data-region="">All Regions</button>' +
+                Object.entries(FluxConstants.SERVER_REGIONS)
+                    .map(([k, r]) => '<button class="ff-btn ff-btn-sm ff-region-btn" data-region="' + k + '">' + r.name + '</button>')
+                    .join('');
 
             modal.innerHTML =
                 '<div style="padding:24px">' +
-                '<h3 style="margin:0 0 16px;font-size:16px">' + FluxIcons.get('filter', { size: 16 }) + ' Server Filters</h3>' +
+                '<h3 style="margin:0 0 12px;font-size:16px">' + FluxIcons.get('filter', { size: 16 }) + ' Filters</h3>' +
                 '<div style="display:flex;flex-direction:column;gap:12px">' +
-                '<label class="ff-checkbox-wrapper"><input type="checkbox" checked id="ff-filter-full"><span class="ff-checkbox-custom"></span><span>Hide Full Servers</span></label>' +
-                '<label class="ff-checkbox-wrapper"><input type="checkbox" id="ff-filter-empty"><span class="ff-checkbox-custom"></span><span>Hide Empty Servers</span></label>' +
+                '<label class="ff-checkbox-wrapper"><input type="checkbox" checked id="ff-f-full"><span class="ff-checkbox-custom"></span><span>Hide Full Servers</span></label>' +
+                '<label class="ff-checkbox-wrapper"><input type="checkbox" id="ff-f-empty"><span class="ff-checkbox-custom"></span><span>Hide Empty Servers</span></label>' +
+                '<div><label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Min Players</label>' +
+                '<input type="number" class="ff-input" id="ff-f-min" min="1" max="100" value="1" style="width:80px"></div>' +
                 '<div><label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Region</label>' +
-                '<div style="display:flex;flex-wrap:wrap;gap:4px" id="ff-region-list">' +
-                '<button class="ff-btn ff-btn-sm ff-region-filter-btn ff-active" data-region="">All Regions</button>' +
-                regionOpts +
-                '</div></div>' +
-                '<div><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Min Players</label>' +
-                '<input type="number" class="ff-input" id="ff-filter-min" min="1" max="100" value="1" style="width:80px"></div>' +
-                '<button class="ff-btn ff-btn-primary" id="ff-apply">Apply Filters</button>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:4px" id="ff-region-list">' + regionBtns + '</div></div>' +
+                '<button class="ff-btn ff-btn-primary" id="ff-apply">Apply</button>' +
                 '</div></div>';
 
-            // Region button styling
-            modal.querySelectorAll('.ff-region-filter-btn').forEach(btn => {
-                btn.style.background = 'transparent';
-                btn.style.borderColor = 'var(--ff-border)';
+            modal.querySelectorAll('.ff-region-btn').forEach(btn => {
                 btn.addEventListener('click', function () {
-                    modal.querySelectorAll('.ff-region-filter-btn').forEach(b => b.classList.remove('ff-active'));
+                    modal.querySelectorAll('.ff-region-btn').forEach(b => b.classList.remove('ff-active'));
                     this.classList.add('ff-active');
                 });
             });
 
+            const savedRegion = FluxStorage.get('serverregionfilter');
+            if (savedRegion) {
+                const activeBtn = modal.querySelector('.ff-region-btn[data-region="' + savedRegion + '"]');
+                if (activeBtn) {
+                    modal.querySelectorAll('.ff-region-btn').forEach(b => b.classList.remove('ff-active'));
+                    activeBtn.classList.add('ff-active');
+                }
+            }
+
             modal.querySelector('#ff-apply').addEventListener('click', () => {
-                const hideFull = modal.querySelector('#ff-filter-full').checked;
-                const hideEmpty = modal.querySelector('#ff-filter-empty').checked;
-                const min = parseInt(modal.querySelector('#ff-filter-min').value) || 1;
-                const regionCode = modal.querySelector('.ff-region-filter-btn.ff-active')?.dataset?.region || '';
+                const hideFull = modal.querySelector('#ff-f-full').checked;
+                const hideEmpty = modal.querySelector('#ff-f-empty').checked;
+                const min = parseInt(modal.querySelector('#ff-f-min').value) || 1;
+                const regionCode = modal.querySelector('.ff-region-btn.ff-active')?.dataset?.region || '';
                 applyFilters({ hideFull, hideEmpty, minPlayers: min });
-                if (regionCode || FluxStorage.get('serverregionfilter')) {
-                    applyRegionFilter(regionCode);
+                if (regionCode) applyRegionFilter(regionCode);
+                else {
+                    // Clear region filter — show all
+                    FluxStorage.set('serverregionfilter', '');
+                    document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM).forEach(i => { i.style.display = ''; });
                 }
                 close();
             });
@@ -3189,15 +3079,12 @@ const FluxFeatureServerBrowser = (() => {
         const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
         let hidden = 0;
         items.forEach(item => {
-            const statusEl = item.querySelector(FluxConstants.SELECTORS.SERVER_STATUS);
-            if (!statusEl) return;
-            const match = statusEl.textContent.match(/(\d+)\s*(?:of|\/)\s*(\d+)/);
-            if (!match) return;
-            const cur = parseInt(match[1]), max = parseInt(match[2]);
-            let hide = false;
-            if (hideFull && cur >= max) hide = true;
-            if (hideEmpty && cur === 0) hide = true;
-            if (cur < minPlayers) hide = true;
+            const se = item.querySelector(FluxConstants.SELECTORS.SERVER_STATUS);
+            if (!se) return;
+            const m = se.textContent.match(/(\d+)\s*(?:of|\/)\s*(\d+)/);
+            if (!m) return;
+            const cur = +m[1], max = +m[2];
+            let hide = (hideFull && cur >= max) || (hideEmpty && cur === 0) || (cur < minPlayers);
             item.style.display = hide ? 'none' : '';
             if (hide) hidden++;
         });
@@ -3206,55 +3093,67 @@ const FluxFeatureServerBrowser = (() => {
 
     function quickJoinRandom() {
         const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
-        const visible = Array.from(items).filter(i => i.style.display !== 'none');
-        if (!visible.length) { FluxNotifications.show('No servers available', 'warning'); return; }
-        const pick = visible[Math.floor(Math.random() * visible.length)];
-        const btn = pick.querySelector(FluxConstants.SELECTORS.SERVER_JOIN_BTN);
-        if (btn) { FluxNotifications.show('Joining random server...', 'info', 2000); btn.click(); }
+        const vis = Array.from(items).filter(i => i.style.display !== 'none');
+        if (!vis.length) { FluxNotifications.show('No servers available', 'warning'); return; }
+        const p = vis[Math.floor(Math.random() * vis.length)];
+        const b = p.querySelector(FluxConstants.SELECTORS.SERVER_JOIN_BTN);
+        if (b) { FluxNotifications.show('Joining...', 'info', 2000); b.click(); }
     }
 
     function observeServerList() {
-        const container = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
-        if (!container) return;
-        if (serverObserver) serverObserver.disconnect();
-
-        serverObserver = new MutationObserver(FluxUtils.debounce(async () => {
-            serverCardsEnhanced = false;
-            await enhanceServerCards();
-            await scanAndCacheRegions();
+        const c = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
+        if (!c || serverObserver) return;
+        serverObserver = new MutationObserver(FluxUtils.debounce(() => {
+            enhanceServerCards();
+            scanAndCacheRegions();
         }, 400));
-
-        serverObserver.observe(container, { childList: true, subtree: false });
+        serverObserver.observe(c, { childList: true, subtree: false });
     }
 
     async function init() {
-        if (enabled) {
-            filterButtonAdded = false;
-            serverCardsEnhanced = false;
-            regionCache.clear();
-            if (serverObserver) { serverObserver.disconnect(); serverObserver = null; }
-        }
+        if (loaded) return;
         if (!FluxStorage.getBool('togglefilterserversbutton', true)) return;
-        enabled = true;
 
-        FluxLogger.info('Server browser: waiting via watchForChild...');
-        await injectFilterButtons();
-        await enhanceServerCards();
+        currentGameId = FluxGamesAPI.getCurrentGameId();
+        if (!currentGameId) {
+            FluxLogger.info('Server browser: no game ID on this page');
+            return;
+        }
+
+        FluxLogger.info('Server browser: waiting for DOM...');
+        await FluxUtils.watchForChild(
+            '#game-instances, .tab-content, [class*="game-instances"]',
+            '#rbx-public-game-server-item-container, .card-list',
+            30000
+        ).catch(() => {
+            FluxLogger.info('Server browser: server container never appeared');
+            return null;
+        });
+
+        const container = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
+        if (!container) {
+            FluxLogger.info('Server browser: still no container after watch');
+            return;
+        }
+
+        loaded = true;
+        injectFilterButtons();
+        enhanceServerCards();
         observeServerList();
-        FluxLogger.info('Server browser: fully loaded');
+        scanAndCacheRegions();
+        FluxLogger.info('Server browser: initialized');
     }
 
     function destroy() {
-        enabled = false;
-        filterButtonAdded = false;
-        serverCardsEnhanced = false;
+        loaded = false;
+        regionScanDone = false;
         regionCache.clear();
         if (serverObserver) { serverObserver.disconnect(); serverObserver = null; }
         const ctrl = document.querySelector('.ff-server-controls');
         if (ctrl) ctrl.remove();
     }
 
-    return { init, destroy, injectFilterButtons, enhanceServerCards, refreshServers };
+    return { init, destroy };
 })();
 
 // ====== MODULE: enhancements (src/features/enhancements.js) ======
@@ -3782,4 +3681,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 21, JS lines: 3687
+// Total modules: 21, JS lines: 3586
