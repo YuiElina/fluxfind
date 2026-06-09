@@ -1,8 +1,12 @@
 /* === Modal Overlay === */
 #ff-modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-    z-index: 999999; display: none; justify-content: center;
-    align-items: center;
+    z-index: 999999; display: none;
+    flex-direction: column; justify-content: center; align-items: center;
+    gap: 16px;
+}
+.ff-modal-overlay-active {
+    display: flex !important;
 }
 
 /* === Modal === */
