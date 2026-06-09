@@ -72,6 +72,7 @@
 .ff-settings-sidebar-btn {
     width: 100%; justify-content: flex-start; margin-bottom: 4px;
     border: none; background: transparent;
+    padding: 16px;
 }
 .ff-settings-sidebar-btn.ff-active { background: var(--ff-bg-hover); }
 
