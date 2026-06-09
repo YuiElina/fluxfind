@@ -99,7 +99,7 @@ const FluxFeatureEnhancements = (() => {
             });
         });
         _termsObserver.observe(document.body, { childList: true, subtree: true });
-        FluxLogger.info('Classic terms restoration active (TreeWalker + MutationObserver)');
+        FluxLogger.info('Classic terms restoration active');
     }
 
     let _termsObserver = null;
@@ -132,27 +132,27 @@ const FluxFeatureEnhancements = (() => {
         if (activeFeatures.has('friends')) return;
         activeFeatures.add('friends');
         enhanceFriendCards();
-        const carousel = document.querySelector('.friends-carousel-list-container, .friend-carousel-container');
-        if (carousel) {
-            friendsObserver = new MutationObserver(FluxUtils.debounce(enhanceFriendCards, 300));
-            friendsObserver.observe(carousel, { childList: true, subtree: true });
-            FluxLogger.info('Better friends: observing friend carousel');
-        } else {
-            FluxLogger.info('Better friends: friend carousel not found on this page');
-        }
+        // Watch the whole body for React re-renders
+        friendsObserver = new MutationObserver(FluxUtils.debounce(enhanceFriendCards, 500));
+        friendsObserver.observe(document.body, { childList: true, subtree: true });
+        FluxLogger.info('Better friends: observing for friend tiles');
     }
     function stopFriends() {
         activeFeatures.delete('friends');
         if (friendsObserver) { friendsObserver.disconnect(); friendsObserver = null; }
     }
     function enhanceFriendCards() {
-        const tiles = document.querySelectorAll('.friends-carousel-tile, [data-testid="friend-tile"]');
+        // Match Roblox's actual class: .friends-carousel-tile
+        const tiles = document.querySelectorAll('.friends-carousel-tile');
         let enhanced = 0;
         tiles.forEach(tile => {
+            // Skip the "Add Friends" tile (it has no avatar-status)
             if (tile.dataset.ffFriends) return;
             tile.dataset.ffFriends = '1';
-            const gameEl = tile.querySelector('.icon-game, .game');
-            if (gameEl || tile.querySelector('[data-testid="presence-icon"]')) {
+            const gameIcon = tile.querySelector('.icon-game, [data-testid="presence-icon"]');
+            const hasGame = tile.querySelector('.avatar-status .game, .icon-game') ||
+                            tile.querySelector('[data-testid="presence-icon"].game');
+            if (hasGame || gameIcon) {
                 tile.style.boxShadow = '0 0 12px rgba(108,92,231,0.3)';
                 tile.style.borderRadius = '8px';
                 tile.style.transition = 'box-shadow 0.3s ease';
@@ -162,50 +162,47 @@ const FluxFeatureEnhancements = (() => {
         if (enhanced > 0) FluxLogger.info(`Better friends: ${enhanced} online friends highlighted`);
     }
 
-    /* ========== 6. Better Profile Info ========== */
+    /* ========== 6. Better Profile Info (replaces Roblox buttons) ========== */
     let profileObserver = null;
     async function enableBetterProfile() {
         if (!FluxStorage.getBool('betterprofileinfo')) { stopProfile(); return; }
         if (activeFeatures.has('profile')) return;
         activeFeatures.add('profile');
-        await injectProfileStats();
-        const profileContainer = document.querySelector('.profile-header, [data-testid="profile-header"]');
-        if (profileContainer) {
-            profileObserver = new MutationObserver(FluxUtils.debounce(() => injectProfileStats(), 500));
-            profileObserver.observe(profileContainer, { childList: true, subtree: true });
-        }
+        await replaceProfileStats();
+        profileObserver = new MutationObserver(FluxUtils.debounce(() => replaceProfileStats(), 800));
+        profileObserver.observe(document.body, { childList: true, subtree: true });
     }
     function stopProfile() {
         activeFeatures.delete('profile');
         if (profileObserver) { profileObserver.disconnect(); profileObserver = null; }
-        const panel = document.getElementById('ff-profile-stats');
-        if (panel) panel.remove();
     }
-    async function injectProfileStats() {
-        if (document.getElementById('ff-profile-stats')) return;
+    async function replaceProfileStats() {
         const profileMatch = window.location.pathname.match(/\/users\/(\d+)/);
         const targetId = profileMatch ? parseInt(profileMatch[1]) : null;
-        if (!targetId) { FluxLogger.info('Better profile: no profile ID in URL'); return; }
+        if (!targetId) return;
 
         try {
             const stats = await FluxUsersAPI.getUserStats(targetId, 'smartsearch');
-            if (!stats) { FluxLogger.info('Better profile: no stats returned for user ' + targetId); return; }
+            if (!stats) return;
 
-            const container = document.querySelector('.profile-header-top, .profile-header, .profile-about, [class*="profile-header"]');
-            if (!container) { FluxLogger.info('Better profile: profile header container not found'); return; }
-
-            const panel = FluxDOM.el('div', {
-                id: 'ff-profile-stats',
-                className: 'ff-profile-stats-panel',
-                style: 'display:flex;gap:16px;margin-top:12px;padding:12px 16px;background:var(--ff-bg-secondary);border-radius:var(--ff-radius-md);border:1px solid var(--ff-border);font-size:13px;color:var(--ff-text-secondary)'
-            });
-            panel.innerHTML = `
-                <span>${FluxIcons.get('users', { size: 14 })} ${(stats.friendCount || 0).toLocaleString()} Friends</span>
-                <span>${FluxIcons.get('heart', { size: 14 })} ${(stats.followerCount || 0).toLocaleString()} Followers</span>
-            `;
-            container.appendChild(panel);
-            FluxLogger.info(`Better profile: stats injected for user ${targetId}`);
-        } catch (e) { FluxLogger.info('Better profile: API call failed', e); }
+            // Find Roblox's existing friend/follower button row
+            const friendLinks = document.querySelectorAll('.flex-nowrap.gap-small a[href*="/friends"]');
+            if (friendLinks.length >= 2) {
+                const friendSpan = friendLinks[0].querySelector('span');
+                if (friendSpan && !friendSpan.dataset.ffProfileReplaced) {
+                    friendSpan.dataset.ffProfileReplaced = '1';
+                    friendSpan.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px">${FluxIcons.get('users', { size: 14 })} ${(stats.friendCount || 0).toLocaleString()} Friends</span>`;
+                }
+                if (friendLinks[1]) {
+                    const followerSpan = friendLinks[1].querySelector('span');
+                    if (followerSpan && !followerSpan.dataset.ffProfileReplaced) {
+                        followerSpan.dataset.ffProfileReplaced = '1';
+                        followerSpan.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px">${FluxIcons.get('heart', { size: 14 })} ${(stats.followerCount || 0).toLocaleString()} Followers</span>`;
+                    }
+                }
+                FluxLogger.info(`Better profile: stats replaced for user ${targetId}`);
+            }
+        } catch (e) { FluxLogger.info('Better profile: API failed', e); }
     }
 
     /* ========== 7. Smart Search ========== */
@@ -286,7 +283,7 @@ const FluxFeatureEnhancements = (() => {
             const favGames = await FluxGamesAPI.getFavoriteGames(userId);
             if (!favGames || favGames.length < 3) { FluxLogger.info('Quick launch: not enough favorite games'); return; }
 
-            const panel = FluxDOM.el('div', { id: 'ff-quick-launch', className: 'ff-quick-launch-panel' });
+            const panel = FluxDOM.el('div', { id: 'ff-quick-launch' });
             panel.innerHTML = `<h3 style="margin:0 0 12px;font-size:14px;font-weight:600;color:var(--ff-text-primary)">${FluxIcons.get('zap', { size: 14 })} Quick Launch</h3>`;
             const btnContainer = FluxDOM.el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' });
 
@@ -327,10 +324,10 @@ const FluxFeatureEnhancements = (() => {
         try {
             const universeId = await FluxGamesAPI.getUniverseId(gameId);
             const votes = await FluxGamesAPI.getGameVotes(universeId);
-            if (!votes) { FluxLogger.info('Game stats: no vote data for universe ' + universeId); return; }
+            if (!votes) return;
 
             const statContainer = document.querySelector('.game-stat, .game-stats-container, [class*="game-stats"], .game-details-info');
-            if (!statContainer) { FluxLogger.info('Game stats: stat container not found'); return; }
+            if (!statContainer) return;
 
             const badge = FluxDOM.el('div', {
                 id: 'ff-vote-badge',
@@ -346,7 +343,6 @@ const FluxFeatureEnhancements = (() => {
 
     /* ========== Init ========== */
 
-    /** Called by FluxApp.activateFeature('enhancements', ...) */
     function init() {
         FluxLogger.info('Enhancements module: applying all settings');
 
@@ -357,7 +353,6 @@ const FluxFeatureEnhancements = (() => {
         enableBetterFriends();
         enableSmartSearch();
 
-        // API-dependent features (deferred to allow page DOM to load)
         setTimeout(() => {
             enableBetterProfile();
             enableQuickLaunch();
@@ -366,27 +361,11 @@ const FluxFeatureEnhancements = (() => {
     }
 
     function applySingleSetting(key, value) {
-        const handlers = {
-            disablechat: enableDisableChat,
-            smallerrobloxsidebar: enableSmallerSidebar,
-            responsivegamecards: enableResponsiveCards,
-            restoreclassicterms: enableClassicTerms,
-            betterfriends: enableBetterFriends,
-            betterprofileinfo: enableBetterProfile,
-            smartsearch: enableSmartSearch,
-            quicklaunchgames: enableQuickLaunch,
-            bettergamestats: enableBetterGameStats,
-        };
-
-        FluxLogger.info(`Enhancements: applying setting ${key}=${value}`);
-        if (handlers[key]) {
-            handlers[key]();
-        }
+        FluxLogger.info(`Enhancements: ${key}=${value}`);
     }
 
     return {
-        init,  // MUST be named 'init' for FluxApp.activateFeature()
-        applySingleSetting,
+        init, applySingleSetting,
         enableDisableChat, stopChat,
         enableSmallerSidebar, stopSidebar,
         enableResponsiveCards, stopCards,
