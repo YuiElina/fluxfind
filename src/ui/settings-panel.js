@@ -1,6 +1,7 @@
 /**
  * FluxFind Settings Panel Module
- * Full settings UI with sections, presets, import/export, and live preview
+ * Full settings UI with sections, presets, import/export, and live preview.
+ * All event handling uses addEventListener — no inline onclick/onchange attributes.
  *
  * @module ui/settings-panel
  * @license GPL-2.0-only
@@ -11,135 +12,213 @@ const FluxSettingsPanel = (() => {
 
     let isOpen = false;
 
-    const SECTIONS = ['home', 'appearance', 'servers', 'filters', 'privacy', 'about'];
+    /* ============ Toggle Switch Generator (Apple‑style) ============ */
 
     function _createToggle(label, storageKey, defaultValue = false) {
         const currentValue = FluxStorage.getBool(storageKey, defaultValue);
-        return `
-            <label class="ff-checkbox-wrapper">
-                <input type="checkbox" ${currentValue ? 'checked' : ''}
-                    onchange="FluxStorage.setBool('${storageKey}', this.checked); FluxSettingsPanel._onSettingChange('${storageKey}', this.checked)">
-                <span class="ff-checkbox-custom"></span>
-                <span>${FluxSanitizer.escapeHtml(label)}</span>
-            </label>
-        `;
+        const wrapper = FluxDOM.el('label', { className: 'ff-toggle-wrapper' });
+
+        const input = FluxDOM.el('input', {
+            type: 'checkbox',
+            className: 'ff-toggle-input'
+        });
+        if (currentValue) input.checked = true;
+
+        input.addEventListener('change', function () {
+            FluxStorage.setBool(storageKey, this.checked);
+            FluxSettingsPanel._onSettingChange(storageKey, this.checked);
+        });
+
+        const track = FluxDOM.el('span', { className: 'ff-toggle-track' });
+        const knob = FluxDOM.el('span', { className: 'ff-toggle-knob' });
+        track.appendChild(knob);
+
+        const labelSpan = FluxDOM.el('span', { className: 'ff-toggle-label' });
+        labelSpan.textContent = label;
+
+        wrapper.appendChild(input);
+        wrapper.appendChild(track);
+        wrapper.appendChild(labelSpan);
+
+        return wrapper;
     }
+
+    /* ============ Select Generator ============ */
 
     function _createSelect(label, storageKey, options, defaultValue) {
         const currentValue = FluxStorage.get(storageKey, defaultValue);
-        const opts = options.map(o => {
-            const selected = o.value === currentValue ? 'selected' : '';
-            return `<option value="${o.value}" ${selected}>${FluxSanitizer.escapeHtml(o.label)}</option>`;
-        }).join('');
-        return `
-            <div class="ff-settings-select-wrap">
-                <label class="ff-settings-select-label">${FluxSanitizer.escapeHtml(label)}</label>
-                <select class="ff-select" style="width:100%;"
-                    onchange="FluxStorage.set('${storageKey}', this.value); FluxSettingsPanel._onSettingChange('${storageKey}', this.value)">
-                    ${opts}
-                </select>
-            </div>
-        `;
+        const container = FluxDOM.el('div', { className: 'ff-settings-select-wrap' });
+
+        const lbl = FluxDOM.el('label', { className: 'ff-settings-select-label' });
+        lbl.textContent = label;
+
+        const select = FluxDOM.el('select', {
+            className: 'ff-select',
+            style: { width: '100%' }
+        });
+
+        options.forEach(o => {
+            const opt = FluxDOM.el('option', { value: o.value });
+            opt.textContent = o.label;
+            if (o.value === currentValue) opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        select.addEventListener('change', function () {
+            FluxStorage.set(storageKey, this.value);
+            FluxSettingsPanel._onSettingChange(storageKey, this.value);
+        });
+
+        container.appendChild(lbl);
+        container.appendChild(select);
+        return container;
     }
 
+    /* ============ Button Generator ============ */
+
+    function _createButton(html, className, onClick) {
+        const btn = FluxDOM.el('button', { className: `ff-btn ${className}` });
+        btn.innerHTML = html;
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    /* ============ Section Content Renderers ============ */
+
     function _sectionHome() {
-        return `
-            <div class="ff-settings-home-header">
-                <div>${FluxIcons.getLogoSVG(56)}</div>
-                <div>
-                    <h2 class="ff-settings-home-title">FluxFind</h2>
-                    <p class="ff-settings-home-version">Version ${FluxConstants.VERSION}</p>
-                </div>
-            </div>
-            <div class="ff-divider"></div>
-            <div class="ff-settings-home-actions">
-                <button class="ff-btn" onclick="FluxSettingsPanel.exportSettings()">
-                    ${FluxIcons.get('download', { size: 16 })} Export
-                </button>
-                <button class="ff-btn" onclick="FluxSettingsPanel.importSettings()">
-                    ${FluxIcons.get('upload', { size: 16 })} Import
-                </button>
-                <button class="ff-btn ff-btn-danger" onclick="FluxSettingsPanel.resetSettings()">
-                    ${FluxIcons.get('trash', { size: 16 })} Reset
-                </button>
-            </div>
-            <h3 class="ff-settings-preset-title">Quick Presets</h3>
-            <div class="ff-settings-preset-list">
-                ${Object.entries(FluxConstants.PRESET_CONFIGURATIONS).map(([key, preset]) => `
-                    <button class="ff-btn ff-btn-sm" onclick="FluxSettingsPanel.applyPreset('${key}')">
-                        ${FluxSanitizer.escapeHtml(preset.name)}
-                    </button>
-                `).join('')}
-            </div>
-        `;
+        const frag = document.createDocumentFragment();
+
+        const header = FluxDOM.el('div', { className: 'ff-settings-home-header' });
+        const logoDiv = FluxDOM.el('div');
+        logoDiv.innerHTML = FluxIcons.getLogoSVG(56);
+        const infoDiv = FluxDOM.el('div');
+        const title = FluxDOM.el('h2', { className: 'ff-settings-home-title' });
+        title.textContent = 'FluxFind';
+        const ver = FluxDOM.el('p', { className: 'ff-settings-home-version' });
+        ver.textContent = `Version ${FluxConstants.VERSION}`;
+        infoDiv.appendChild(title);
+        infoDiv.appendChild(ver);
+        header.appendChild(logoDiv);
+        header.appendChild(infoDiv);
+        frag.appendChild(header);
+        frag.appendChild(FluxDOM.el('div', { className: 'ff-divider' }));
+
+        const actions = FluxDOM.el('div', { className: 'ff-settings-home-actions' });
+        actions.appendChild(_createButton(
+            `${FluxIcons.get('download', { size: 16 })} Export`, '',
+            () => FluxSettingsPanel.exportSettings()
+        ));
+        actions.appendChild(_createButton(
+            `${FluxIcons.get('upload', { size: 16 })} Import`, '',
+            () => FluxSettingsPanel.importSettings()
+        ));
+        actions.appendChild(_createButton(
+            `${FluxIcons.get('trash', { size: 16 })} Reset`, 'ff-btn-danger',
+            () => FluxSettingsPanel.resetSettings()
+        ));
+        frag.appendChild(actions);
+
+        const presetTitle = FluxDOM.el('h3', { className: 'ff-settings-preset-title' });
+        presetTitle.textContent = 'Quick Presets';
+        frag.appendChild(presetTitle);
+
+        const presetList = FluxDOM.el('div', { className: 'ff-settings-preset-list' });
+        Object.entries(FluxConstants.PRESET_CONFIGURATIONS).forEach(([key, preset]) => {
+            presetList.appendChild(_createButton(
+                FluxSanitizer.escapeHtml(preset.name), 'ff-btn-sm',
+                () => FluxSettingsPanel.applyPreset(key)
+            ));
+        });
+        frag.appendChild(presetList);
+
+        return frag;
     }
 
     function _sectionAppearance() {
-        return `
-            <h3 class="ff-settings-section-title">Appearance</h3>
-            ${_createToggle('Force Dark Mode', 'forcedarkmode')}
-            ${_createToggle('Responsive Game Cards', 'responsivegamecards', true)}
-            ${_createToggle('Smaller Roblox Sidebar', 'smallerrobloxsidebar')}
-            ${_createToggle('Restore Classic Terms', 'restoreclassicterms')}
-            ${_createToggle('Custom Backgrounds (Experimental)', 'custombackgrounds')}
-        `;
+        const frag = document.createDocumentFragment();
+        const title = FluxDOM.el('h3', { className: 'ff-settings-section-title' });
+        title.textContent = 'Appearance';
+        frag.appendChild(title);
+        frag.appendChild(_createToggle('Force Dark Mode', 'forcedarkmode'));
+        frag.appendChild(_createToggle('Responsive Game Cards', 'responsivegamecards', true));
+        frag.appendChild(_createToggle('Smaller Roblox Sidebar', 'smallerrobloxsidebar'));
+        frag.appendChild(_createToggle('Restore Classic Terms', 'restoreclassicterms'));
+        frag.appendChild(_createToggle('Custom Backgrounds (Experimental)', 'custombackgrounds'));
+        return frag;
     }
 
     function _sectionServers() {
-        return `
-            <h3 class="ff-settings-section-title">Server Options</h3>
-            ${_createToggle('Enable Server Filters Button', 'togglefilterserversbutton', true)}
-            ${_createToggle('Auto Server Regions', 'autoserverregions', true)}
-            ${_createToggle('Better Private Servers', 'betterprivateservers', true)}
-            ${_createSelect('Server Region Count', 'autoserverregionnumber', [
-                { value: '8', label: '8 Regions' },
-                { value: '16', label: '16 Regions (Default)' },
-                { value: '24', label: '24 Regions' },
-                { value: '32', label: '32 Regions' },
-                { value: '48', label: '48 Regions' }
-            ], '16')}
-            ${_createToggle('Show Server Join Time', 'showserverjointime')}
-            ${_createToggle('Track Recent Servers', 'trackrecentservers', true)}
-        `;
+        const frag = document.createDocumentFragment();
+        const title = FluxDOM.el('h3', { className: 'ff-settings-section-title' });
+        title.textContent = 'Server Options';
+        frag.appendChild(title);
+        frag.appendChild(_createToggle('Enable Server Filters Button', 'togglefilterserversbutton', true));
+        frag.appendChild(_createToggle('Auto Server Regions', 'autoserverregions', true));
+        frag.appendChild(_createToggle('Better Private Servers', 'betterprivateservers', true));
+        frag.appendChild(_createSelect('Server Region Count', 'autoserverregionnumber', [
+            { value: '8', label: '8 Regions' },
+            { value: '16', label: '16 Regions (Default)' },
+            { value: '24', label: '24 Regions' },
+            { value: '32', label: '32 Regions' },
+            { value: '48', label: '48 Regions' }
+        ], '16'));
+        frag.appendChild(_createToggle('Show Server Join Time', 'showserverjointime'));
+        frag.appendChild(_createToggle('Track Recent Servers', 'trackrecentservers', true));
+        return frag;
     }
 
     function _sectionFilters() {
-        return `
-            <h3 class="ff-settings-section-title">Filter Options</h3>
-            ${_createToggle('Remove Ads', 'removeads', true)}
-            ${_createToggle('Smart Search', 'smartsearch', true)}
-            ${_createToggle('Better Game Stats', 'bettergamestats', true)}
-            ${_createToggle('Quality Filter Games', 'qualityfiltergames')}
-            ${_createToggle('Quick Launch Games', 'quicklaunchgames', true)}
-        `;
+        const frag = document.createDocumentFragment();
+        const title = FluxDOM.el('h3', { className: 'ff-settings-section-title' });
+        title.textContent = 'Filter Options';
+        frag.appendChild(title);
+        frag.appendChild(_createToggle('Remove Ads', 'removeads', true));
+        frag.appendChild(_createToggle('Smart Search', 'smartsearch', true));
+        frag.appendChild(_createToggle('Better Game Stats', 'bettergamestats', true));
+        frag.appendChild(_createToggle('Quality Filter Games', 'qualityfiltergames'));
+        frag.appendChild(_createToggle('Quick Launch Games', 'quicklaunchgames', true));
+        return frag;
     }
 
     function _sectionPrivacy() {
-        return `
-            <h3 class="ff-settings-section-title">Privacy & Safety</h3>
-            ${_createToggle('Disable Chat Bar', 'disablechat')}
-            ${_createToggle('Better Friends Page', 'betterfriends')}
-            ${_createToggle('Show Better Profile Info', 'betterprofileinfo')}
-            ${_createToggle('Mute Toxic Players (Experimental)', 'mutetoxicplayers')}
-        `;
+        const frag = document.createDocumentFragment();
+        const title = FluxDOM.el('h3', { className: 'ff-settings-section-title' });
+        title.textContent = 'Privacy & Safety';
+        frag.appendChild(title);
+        frag.appendChild(_createToggle('Disable Chat Bar', 'disablechat'));
+        frag.appendChild(_createToggle('Better Friends Page', 'betterfriends'));
+        frag.appendChild(_createToggle('Show Better Profile Info', 'betterprofileinfo'));
+        frag.appendChild(_createToggle('Mute Toxic Players (Experimental)', 'mutetoxicplayers'));
+        return frag;
     }
 
     function _sectionAbout() {
-        return `
-            <div class="ff-settings-about">
-                <div class="ff-settings-about-logo">${FluxIcons.getLogoSVG(64)}</div>
-                <h3 class="ff-settings-about-title">FluxFind v${FluxConstants.VERSION}</h3>
-                <p class="ff-settings-about-desc">
-                    Enhanced Roblox server browser with filtering, region detection,<br>
-                    smart search, and quality-of-life improvements.
-                </p>
-                <div class="ff-settings-about-toggles">
-                    ${_createToggle('Enable Logs', 'enableLogs')}
-                    ${_createToggle('Show Notifications', 'enablenotifications', true)}
-                </div>
-                <p class="ff-settings-about-footer">Licensed under GPL-2.0-only. Free and open source software.</p>
-            </div>
-        `;
+        const frag = document.createDocumentFragment();
+        const wrap = FluxDOM.el('div', { className: 'ff-settings-about' });
+
+        const logoDiv = FluxDOM.el('div', { className: 'ff-settings-about-logo' });
+        logoDiv.innerHTML = FluxIcons.getLogoSVG(64);
+        wrap.appendChild(logoDiv);
+
+        const h3 = FluxDOM.el('h3', { className: 'ff-settings-about-title' });
+        h3.textContent = `FluxFind v${FluxConstants.VERSION}`;
+        wrap.appendChild(h3);
+
+        const desc = FluxDOM.el('p', { className: 'ff-settings-about-desc' });
+        desc.innerHTML = 'Enhanced Roblox server browser with filtering, region detection,<br>smart search, and quality-of-life improvements.';
+        wrap.appendChild(desc);
+
+        const toggles = FluxDOM.el('div', { className: 'ff-settings-about-toggles' });
+        toggles.appendChild(_createToggle('Enable Logs', 'enableLogs'));
+        toggles.appendChild(_createToggle('Show Notifications', 'enablenotifications', true));
+        wrap.appendChild(toggles);
+
+        const footer = FluxDOM.el('p', { className: 'ff-settings-about-footer' });
+        footer.textContent = 'Licensed under GPL-2.0-only. Free and open source software.';
+        wrap.appendChild(footer);
+
+        frag.appendChild(wrap);
+        return frag;
     }
 
     function _getSectionContent(section) {
@@ -154,6 +233,8 @@ const FluxSettingsPanel = (() => {
         return (map[section] || _sectionHome)();
     }
 
+    /* ============ Open Settings Panel ============ */
+
     function open() {
         if (isOpen) return;
         isOpen = true;
@@ -167,19 +248,22 @@ const FluxSettingsPanel = (() => {
 
         FluxModals.custom((modal, closeModal) => {
             const header = FluxDOM.el('div', { className: 'ff-settings-header' });
-            header.innerHTML = `
-                <h2 class="ff-settings-header-title">${FluxIcons.get('settings', { size: 18 })} Settings</h2>
-                <button class="ff-btn ff-btn-sm" id="ff-settings-close">${FluxIcons.get('close', { size: 16 })}</button>
-            `;
+            const headerTitle = FluxDOM.el('h2', { className: 'ff-settings-header-title' });
+            headerTitle.innerHTML = `${FluxIcons.get('settings', { size: 18 })} Settings`;
+            const closeBtn = FluxDOM.el('button', { className: 'ff-btn ff-btn-sm' });
+            closeBtn.innerHTML = FluxIcons.get('close', { size: 16 });
+            closeBtn.addEventListener('click', closeModal);
+            header.appendChild(headerTitle);
+            header.appendChild(closeBtn);
 
             const body = FluxDOM.el('div', { className: 'ff-settings-body' });
-
             const sidebar = FluxDOM.el('div', { className: 'ff-settings-sidebar' });
             const content = FluxDOM.el('div', {
                 id: 'ff-settings-content',
                 className: 'ff-settings-content ff-scrollbar'
             });
 
+            const sidebarBtns = [];
             SECTIONS.forEach((section, index) => {
                 const btn = FluxDOM.el('button', {
                     className: 'ff-btn ff-btn-sm ff-settings-sidebar-btn' + (index === 0 ? ' ff-active' : '')
@@ -188,31 +272,35 @@ const FluxSettingsPanel = (() => {
                     ${section.charAt(0).toUpperCase() + section.slice(1)}`;
                 btn.addEventListener('click', () => {
                     activeSection = section;
-                    content.innerHTML = _getSectionContent(section);
-                    sidebar.querySelectorAll('button').forEach((b, i) => {
-                        b.classList.toggle('ff-active', i === index);
+                    content.innerHTML = '';
+                    content.appendChild(_getSectionContent(section));
+                    sidebarBtns.forEach((b, i) => {
+                        b.classList.toggle('ff-active', i === SECTIONS.indexOf(section));
                     });
                 });
                 sidebar.appendChild(btn);
+                sidebarBtns.push(btn);
             });
 
-            content.innerHTML = _getSectionContent('home');
+            content.appendChild(_getSectionContent('home'));
             body.appendChild(sidebar);
             body.appendChild(content);
             modal.appendChild(header);
             modal.appendChild(body);
-
-            header.querySelector('#ff-settings-close').addEventListener('click', closeModal);
         }, { width: '700px', onClose: () => { isOpen = false; } });
     }
 
+    /* ============ Setting Change Callback ============ */
+
     function _onSettingChange(key, value) {
         FluxLogger.debug(`Setting changed: ${key} = ${value}`);
-        FluxNotifications.show(`Setting updated`, 'success', 1500);
+        FluxNotifications.show('Setting updated', 'success', 1500);
         if (typeof FluxApp !== 'undefined' && FluxApp.applySettings) {
             FluxApp.applySettings(key, value);
         }
     }
+
+    /* ============ Export / Import / Reset ============ */
 
     function exportSettings() {
         const keys = FluxStorage.listKeys();
