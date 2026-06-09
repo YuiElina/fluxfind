@@ -48,6 +48,22 @@
     transform: rotate(45deg); margin-top: -1px;
 }
 
+/* === Region Filter Buttons === */
+.ff-region-btn {
+    border: 1px solid var(--ff-border) !important;
+    background: transparent !important;
+    transition: all 0.15s ease;
+}
+.ff-region-btn:hover {
+    border-color: var(--ff-accent) !important;
+    background: rgba(108,92,231,0.1) !important;
+}
+.ff-region-btn.ff-active {
+    border-color: var(--ff-accent) !important;
+    background: var(--ff-accent) !important;
+    color: #fff !important;
+}
+
 /* === Misc UI === */
 .ff-tooltip { position: relative; }
 .ff-tooltip::after {

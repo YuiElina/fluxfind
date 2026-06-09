@@ -1314,7 +1314,6 @@ const FluxHttpClient = (() => {
  * @module api/games
  * @license GPL-2.0-only
  */
-
 const FluxGamesAPI = (() => {
     'use strict';
 
@@ -1322,22 +1321,15 @@ const FluxGamesAPI = (() => {
     const { GAME_ICONS, GAME_VOTES } = FluxConstants.CHUNK_SIZES;
 
     function getCurrentGameId() {
-        const match = window.location.href.match(/\/games\/(\d+)/);
-        return match ? FluxSanitizer.sanitizeUserId(match[1]) : 0;
+        const m = window.location.href.match(/\/games\/(\d+)/);
+        return m ? FluxSanitizer.sanitizeUserId(m[1]) : 0;
     }
 
     async function getUniverseId(placeId) {
-        const safeId = FluxSanitizer.sanitizeUserId(placeId);
-        if (!safeId) throw new Error('Invalid place ID');
-        const data = await FluxHttpClient.get(
-            `${GAMES_API}/games/multiget-place-details`,
-            { placeIds: safeId },
-            { cache: true }
-        );
-        if (Array.isArray(data) && data.length > 0 && data[0].universeId) {
-            FluxLogger.debug('Universe ID for place ' + safeId + ': ' + data[0].universeId);
-            return data[0].universeId;
-        }
+        const safe = FluxSanitizer.sanitizeUserId(placeId);
+        if (!safe) throw new Error('Invalid place ID');
+        const d = await FluxHttpClient.get(`${GAMES_API}/games/multiget-place-details`, { placeIds: safe }, { cache: true });
+        if (Array.isArray(d) && d.length && d[0].universeId) return d[0].universeId;
         throw new Error('Universe ID not found');
     }
 
@@ -1345,135 +1337,118 @@ const FluxGamesAPI = (() => {
         const single = !Array.isArray(universeIds);
         const ids = single ? [universeIds] : universeIds;
         const chunks = FluxUtils.chunk(ids, GAME_ICONS);
-
-        const chunkPromises = chunks.map(chunk =>
-            FluxHttpClient.get(`${THUMBNAILS_API}/games/icons`, {
-                universeIds: chunk.join(','),
-                size: '512x512', format: 'Png', isCircular: 'false', returnPolicy: 'PlaceHolder'
-            }, { cache: true }).then(r => r.data || [])
-        );
-
-        return Promise.all(chunkPromises).then(results => {
-            const combined = results.flat();
-            if (combined.length === 0) throw new Error('No icon data returned');
-            if (single) {
-                const item = combined.find(d => String(d.targetId) === String(universeIds));
-                return item ? item.imageUrl : null;
-            }
-            const map = {};
-            combined.forEach(item => { if (item.imageUrl) map[item.targetId] = item.imageUrl; });
-            return map;
+        const proms = chunks.map(c => FluxHttpClient.get(`${THUMBNAILS_API}/games/icons`, {
+            universeIds: c.join(','), size: '512x512', format: 'Png', isCircular: 'false', returnPolicy: 'PlaceHolder'
+        }, { cache: true }).then(r => r.data || []));
+        return Promise.all(proms).then(rr => {
+            const all = rr.flat();
+            if (!all.length) throw new Error('No icons');
+            if (single) { const f = all.find(d => String(d.targetId) === String(universeIds)); return f ? f.imageUrl : null; }
+            const m = {};
+            all.forEach(d => { if (d.imageUrl) m[d.targetId] = d.imageUrl; });
+            return m;
         });
     }
 
     async function getGameDetails(universeIds) {
         const single = !Array.isArray(universeIds);
         const ids = single ? [universeIds] : universeIds;
-        const data = await FluxHttpClient.get(
-            `${GAMES_API}/games`,
-            { universeIds: ids.join(',') },
-            { cache: true }
-        );
-        if (single) return (data.data && data.data.length > 0) ? data.data[0] : null;
-        const map = {};
-        if (data.data) data.data.forEach(game => { map[game.id] = game; });
-        return map;
+        const d = await FluxHttpClient.get(`${GAMES_API}/games`, { universeIds: ids.join(',') }, { cache: true });
+        if (single) return (d.data && d.data.length) ? d.data[0] : null;
+        const m = {};
+        if (d.data) d.data.forEach(g => { m[g.id] = g; });
+        return m;
     }
 
     function getGameVotes(universeIds) {
         const single = !Array.isArray(universeIds);
         const ids = single ? [universeIds] : universeIds;
         const chunks = FluxUtils.chunk(ids, GAME_VOTES);
-        const chunkPromises = chunks.map(chunk =>
-            FluxHttpClient.get(`${GAMES_API}/games/votes`,
-                { universeIds: chunk.join(',') },
-                { cache: true }
-            ).then(r => r.data || [])
-        );
-        return Promise.all(chunkPromises).then(results => {
-            const combined = results.flat();
-            if (combined.length === 0) throw new Error('No vote data');
-            if (single) {
-                const item = combined.find(d => String(d.id) === String(universeIds));
-                return item ? { upVotes: item.upVotes, downVotes: item.downVotes } : null;
-            }
-            const map = {};
-            combined.forEach(item => { map[item.id] = { upVotes: item.upVotes, downVotes: item.downVotes }; });
-            return map;
+        const proms = chunks.map(c => FluxHttpClient.get(`${GAMES_API}/games/votes`, { universeIds: c.join(',') }, { cache: true }).then(r => r.data || []));
+        return Promise.all(proms).then(rr => {
+            const all = rr.flat();
+            if (!all.length) throw new Error('No votes');
+            if (single) { const f = all.find(d => String(d.id) === String(universeIds)); return f ? { upVotes: f.upVotes, downVotes: f.downVotes } : null; }
+            const m = {};
+            all.forEach(d => { m[d.id] = { upVotes: d.upVotes, downVotes: d.downVotes }; });
+            return m;
         });
     }
 
     async function getFavoriteGames(userId) {
-        const safeId = FluxSanitizer.sanitizeUserId(userId);
-        if (!safeId) return [];
-        const data = await FluxHttpClient.get(
-            `${GAMES_API}/users/${safeId}/favorite/games`, {}, { cache: true }
-        );
-        return data.data || [];
+        const safe = FluxSanitizer.sanitizeUserId(userId);
+        if (!safe) return [];
+        const d = await FluxHttpClient.get(`${GAMES_API}/users/${safe}/favorite/games`, {}, { cache: true });
+        return d.data || [];
     }
 
     async function joinServer(placeId, serverId) {
-        const csrfToken = FluxDOM.getCsrfToken();
-        if (!csrfToken) throw new Error('No CSRF token available');
-        return FluxHttpClient.post(
-            `${FluxConstants.API.JOIN_API}/join`,
-            { placeId: FluxSanitizer.sanitizeUserId(placeId), gameId: serverId },
-            { headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json' } }
-        );
+        const t = FluxDOM.getCsrfToken();
+        if (!t) throw new Error('No CSRF token');
+        return FluxHttpClient.post(`${FluxConstants.API.JOIN_API}/join`, {
+            placeId: FluxSanitizer.sanitizeUserId(placeId), gameId: serverId
+        }, { headers: { 'X-CSRF-TOKEN': t, 'Content-Type': 'application/json' } });
     }
 
     /**
-     * Get server details including DataCenterId.
-     * Returns null for full/private servers (HTTP 404 — no join script available).
+     * Fetch up to 100 public servers for a game via the public API.
+     * Each server object includes jobId and player counts.
+     * Response: { nextPageCursor, previousPageCursor, data: [{id, maxPlayers, playing, fps, ping, ...}] }
      */
-    async function getServerDetails(gameId, jobId) {
-        const url = `${ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${jobId}`;
+    async function fetchPublicServers(gameId, sortOrder = 'Asc', cursor = null, limit = 100) {
+        const url = `${GAMES_API}/games/${gameId}/servers/Public?sortOrder=${sortOrder}&limit=${limit}${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`;
         const response = await fetch(url, { credentials: 'include' });
-        if (!response.ok) return null; // 404 = full server, 403 = private — both expected
-        const data = await response.json();
-        return data;
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
     }
 
     /**
-     * Batch-fetch DataCenterIds. Skips full servers silently (they return 404).
-     * Returns Map<jobId, regionKey>.
+     * Fetch the DataCenterId for a single server jobId (used as fallback when the
+     * public servers list doesn't include DataCenterId — which it usually doesn't).
+     * Returns region key or null.
+     */
+    async function getServerRegion(gameId, jobId) {
+        try {
+            const url = `${ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${jobId}`;
+            const resp = await fetch(url, { credentials: 'include' });
+            if (!resp.ok) return null;
+            const data = await resp.json();
+            const dcId = String(data?.joinScript?.DataCenterId || '');
+            if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
+                return FluxConstants.DATACENTER_REGION_MAP[dcId];
+            }
+        } catch {}
+        return null;
+    }
+
+    /**
+     * Batch-fetch regions for multiple jobIds using the individual server endpoint.
+     * Used as fallback when the public list doesn't include DataCenterId.
      */
     async function fetchServerRegions(gameId, jobIds) {
         if (!jobIds || !jobIds.length) return new Map();
         const results = new Map();
-        let attempted = 0, succeeded = 0, full = 0;
-
-        const tasks = jobIds.map(jobId => async () => {
-            attempted++;
-            try {
-                const data = await getServerDetails(gameId, jobId);
-                if (!data) { full++; return; }
-                const dcId = String(data?.joinScript?.DataCenterId || '');
-                if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
-                    results.set(jobId, FluxConstants.DATACENTER_REGION_MAP[dcId]);
-                    succeeded++;
-                }
-            } catch { full++; }
+        let success = 0, failed = 0;
+        const tasks = jobIds.map(jid => async () => {
+            const region = await getServerRegion(gameId, jid);
+            if (region) { results.set(jid, region); success++; }
+            else failed++;
         });
-
         await FluxUtils.parallelLimit(tasks, 4);
-        FluxLogger.info(`Regions: ${succeeded} found, ${full} full/private, ${attempted} total`);
+        FluxLogger.info(`Regions: ${success} found, ${failed} full/private (${jobIds.length} total)`);
         return results;
     }
 
     async function getUserPresence(userId) {
-        const safeId = FluxSanitizer.sanitizeUserId(userId);
-        if (!safeId) return null;
-        const data = await FluxHttpClient.post(
-            `${FluxConstants.API.PRESENCE_API}/presence/users`,
-            { userIds: [safeId] }, { cache: false }
-        );
-        return data.userPresences?.[0] || null;
+        const safe = FluxSanitizer.sanitizeUserId(userId);
+        if (!safe) return null;
+        const d = await FluxHttpClient.post(`${FluxConstants.API.PRESENCE_API}/presence/users`, { userIds: [safe] }, { cache: false });
+        return d.userPresences?.[0] || null;
     }
 
     return {
         getCurrentGameId, getUniverseId, getGameIcons, getGameDetails, getGameVotes,
-        getFavoriteGames, joinServer, getServerDetails, fetchServerRegions, getUserPresence
+        getFavoriteGames, joinServer, getServerRegion, fetchServerRegions, fetchPublicServers, getUserPresence
     };
 })();
 
@@ -2150,7 +2125,7 @@ const FluxStyles = (() => {
      * The compiled CSS string — replaced by build.js with actual CSS content.
      * Each line is a single-quoted string joined with newlines.
      */
-    const CSS = ':root { --ff-bg-primary: #1f1f1f; --ff-bg-secondary: #252525; --ff-bg-tertiary: #2a2a2a; --ff-bg-hover: #333333; --ff-border: #404040; --ff-border-light: #505050; --ff-text-primary: #e8e8e8; --ff-text-secondary: #b0b0b0; --ff-text-muted: #888888; --ff-accent: #6C5CE7; --ff-accent-hover: #7C6CF7; --ff-success: #4CAF50; --ff-error: #F44336; --ff-warning: #FF9800; --ff-radius-sm: 6px; --ff-radius-md: 8px; --ff-radius-lg: 12px; --ff-radius-xl: 20px; --ff-shadow: 0 4px 16px rgba(0,0,0,0.3); --ff-shadow-lg: 0 8px 32px rgba(0,0,0,0.4); --ff-transition: 0.15s ease; --ff-transition-slow: 0.25s ease; } .ff-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--ff-radius-sm); font: 500 13px -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; cursor: pointer; border: 1px solid var(--ff-border); background: var(--ff-bg-tertiary); color: var(--ff-text-primary); transition: background var(--ff-transition), border-color var(--ff-transition); outline: none; white-space: nowrap; line-height: 1.2; } .ff-btn:hover { background: var(--ff-bg-hover); border-color: var(--ff-border-light); } .ff-btn:active { transform: scale(0.97); } .ff-btn.ff-btn-primary { background: var(--ff-accent); border-color: var(--ff-accent); color: #fff; } .ff-btn.ff-btn-primary:hover { background: var(--ff-accent-hover); } .ff-btn.ff-btn-danger { border-color: var(--ff-error); color: var(--ff-error); } .ff-btn.ff-btn-danger:hover { background: rgba(244,67,54,0.1); } .ff-btn-sm { padding: 4px 10px; font-size: 12px; } .ff-btn-lg { padding: 10px 20px; font-size: 14px; } .ff-input, .ff-select { padding: 8px 12px; border-radius: var(--ff-radius-sm); border: 1px solid var(--ff-border); background: var(--ff-bg-primary); color: var(--ff-text-primary); font-size: 13px; transition: border-color var(--ff-transition); outline: none; } .ff-input:focus, .ff-select:focus { border-color: var(--ff-accent); } .ff-input { width: 100%; box-sizing: border-box; } .ff-select { cursor: pointer; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-tooltip { position: relative; } .ff-tooltip::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #333; color: #e8e8e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 9999; } .ff-tooltip:hover::after { opacity: 1; } .ff-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--ff-accent); color: #fff; line-height: 1.4; } .ff-divider { height: 1px; background: var(--ff-border); margin: 12px 0; border: none; } .ff-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid var(--ff-border); background: var(--ff-bg-secondary); color: var(--ff-text-secondary); margin-left: 8px; } .ff-tag.ff-tag-green { border-color: var(--ff-success); color: var(--ff-success); background: rgba(76,175,80,0.1); } .ff-tag.ff-tag-red { border-color: var(--ff-error); color: var(--ff-error); background: rgba(244,67,54,0.1); } .ff-tag.ff-tag-yellow { border-color: var(--ff-warning); color: var(--ff-warning); background: rgba(255,152,0,0.1); } .ff-tag.ff-tag-purple { border-color: var(--ff-accent); color: var(--ff-accent); background: rgba(108,92,231,0.1); } .ff-scrollbar::-webkit-scrollbar { width: 6px; } .ff-scrollbar::-webkit-scrollbar-track { background: transparent; } .ff-scrollbar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; } .ff-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; } .ff-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--ff-border); border-top-color: var(--ff-accent); border-radius: 50%; animation: ff-spin 0.6s linear infinite; } @keyframes ff-spin { to { transform: rotate(360deg); } } .ff-skeleton { background: linear-gradient(90deg, var(--ff-bg-tertiary) 25%, var(--ff-bg-hover) 50%, var(--ff-bg-tertiary) 75%); background-size: 200% 100%; animation: ff-shimmer 1.5s infinite; border-radius: 4px; } @keyframes ff-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } } #ff-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: none; flex-direction: column; justify-content: center; align-items: center; gap: 16px; } .ff-modal-overlay-active { display: flex !important; } .ff-modal { background: var(--ff-bg-tertiary); border-radius: var(--ff-radius-lg); box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid var(--ff-border); color: var(--ff-text-primary); z-index: 9999999; } .ff-modal.ff-modal-pop { animation: ff-popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; } .ff-modal.ff-modal-closing { animation: ff-fadeIn 0.2s ease reverse forwards; } .ff-modal.ff-modal-confirm { padding: 32px; max-width: 440px; width: 90%; } .ff-modal.ff-modal-custom { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; } .ff-modal-confirm-icon { text-align: center; margin-bottom: 16px; } .ff-modal-confirm-title { margin: 0 0 8px; font-size: 20px; font-weight: 600; text-align: center; } .ff-modal-confirm-msg { margin: 0 0 24px; font-size: 14px; color: var(--ff-text-secondary); text-align: center; line-height: 1.5; } .ff-modal-confirm-actions { display: flex; gap: 10px; justify-content: center; } @keyframes ff-fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes ff-popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } } #fluxfind-settings-btn { position: fixed; bottom: 20px; right: 20px; z-index: 99999; border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(108,92,231,0.4); background: var(--ff-accent); border: none; } .ff-toggle-wrapper { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding: 6px 0; } .ff-toggle-input { display: none; } .ff-toggle-track { position: relative; width: 44px; height: 24px; border-radius: 12px; background: #555; flex-shrink: 0; transition: background 0.25s ease; } .ff-toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); } .ff-toggle-input:checked + .ff-toggle-track { background: var(--ff-accent); } .ff-toggle-input:checked + .ff-toggle-track .ff-toggle-knob { transform: translateX(20px); } .ff-toggle-label { font-size: 13px; font-weight: 500; color: var(--ff-text-primary); line-height: 1.3; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-settings-header { padding: 20px 28px; border-bottom: 1px solid var(--ff-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; } .ff-settings-header-title { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; } .ff-settings-body { display: flex; flex: 1; overflow: hidden; min-height: 0; } .ff-settings-sidebar { width: 180px; padding: 16px 12px; border-right: 1px solid var(--ff-border); flex-shrink: 0; overflow-y: auto; } .ff-settings-sidebar-btn { width: 100%; justify-content: flex-start; margin-bottom: 4px; border: none; background: transparent; padding: 16px; } .ff-settings-sidebar-btn.ff-active { background: var(--ff-bg-hover); } .ff-settings-content { flex: 1; padding: 20px 28px; overflow-y: auto; } .ff-settings-home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; } .ff-settings-home-title { margin: 0; font-size: 22px; font-weight: 700; } .ff-settings-home-version { margin: 4px 0 0; font-size: 13px; color: var(--ff-text-muted); } .ff-settings-home-actions { display: flex; gap: 10px; margin-bottom: 20px; } .ff-settings-preset-title { font-size: 14px; font-weight: 600; margin: 16px 0 10px; } .ff-settings-preset-list { display: flex; flex-wrap: wrap; gap: 8px; } .ff-settings-section-title { font-size: 15px; font-weight: 600; margin: 0 0 14px; } .ff-settings-select-wrap { margin-bottom: 12px; } .ff-settings-select-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ff-text-secondary); } .ff-settings-about { text-align: center; padding: 20px 0; } .ff-settings-about-logo { margin-bottom: 16px; } .ff-settings-about-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; } .ff-settings-about-desc { margin: 0 0 16px; font-size: 13px; color: var(--ff-text-muted); line-height: 1.5; } .ff-settings-about-toggles { display: flex; gap: 16px; justify-content: center; } .ff-settings-about-footer { margin: 20px 0 0; font-size: 11px; color: var(--ff-text-muted); } .ff-server-controls { display: flex; gap: 8px; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; }';
+    const CSS = ':root { --ff-bg-primary: #1f1f1f; --ff-bg-secondary: #252525; --ff-bg-tertiary: #2a2a2a; --ff-bg-hover: #333333; --ff-border: #404040; --ff-border-light: #505050; --ff-text-primary: #e8e8e8; --ff-text-secondary: #b0b0b0; --ff-text-muted: #888888; --ff-accent: #6C5CE7; --ff-accent-hover: #7C6CF7; --ff-success: #4CAF50; --ff-error: #F44336; --ff-warning: #FF9800; --ff-radius-sm: 6px; --ff-radius-md: 8px; --ff-radius-lg: 12px; --ff-radius-xl: 20px; --ff-shadow: 0 4px 16px rgba(0,0,0,0.3); --ff-shadow-lg: 0 8px 32px rgba(0,0,0,0.4); --ff-transition: 0.15s ease; --ff-transition-slow: 0.25s ease; } .ff-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--ff-radius-sm); font: 500 13px -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; cursor: pointer; border: 1px solid var(--ff-border); background: var(--ff-bg-tertiary); color: var(--ff-text-primary); transition: background var(--ff-transition), border-color var(--ff-transition); outline: none; white-space: nowrap; line-height: 1.2; } .ff-btn:hover { background: var(--ff-bg-hover); border-color: var(--ff-border-light); } .ff-btn:active { transform: scale(0.97); } .ff-btn.ff-btn-primary { background: var(--ff-accent); border-color: var(--ff-accent); color: #fff; } .ff-btn.ff-btn-primary:hover { background: var(--ff-accent-hover); } .ff-btn.ff-btn-danger { border-color: var(--ff-error); color: var(--ff-error); } .ff-btn.ff-btn-danger:hover { background: rgba(244,67,54,0.1); } .ff-btn-sm { padding: 4px 10px; font-size: 12px; } .ff-btn-lg { padding: 10px 20px; font-size: 14px; } .ff-input, .ff-select { padding: 8px 12px; border-radius: var(--ff-radius-sm); border: 1px solid var(--ff-border); background: var(--ff-bg-primary); color: var(--ff-text-primary); font-size: 13px; transition: border-color var(--ff-transition); outline: none; } .ff-input:focus, .ff-select:focus { border-color: var(--ff-accent); } .ff-input { width: 100%; box-sizing: border-box; } .ff-select { cursor: pointer; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-region-btn { border: 1px solid var(--ff-border) !important; background: transparent !important; transition: all 0.15s ease; } .ff-region-btn:hover { border-color: var(--ff-accent) !important; background: rgba(108,92,231,0.1) !important; } .ff-region-btn.ff-active { border-color: var(--ff-accent) !important; background: var(--ff-accent) !important; color: #fff !important; } .ff-tooltip { position: relative; } .ff-tooltip::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #333; color: #e8e8e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 9999; } .ff-tooltip:hover::after { opacity: 1; } .ff-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--ff-accent); color: #fff; line-height: 1.4; } .ff-divider { height: 1px; background: var(--ff-border); margin: 12px 0; border: none; } .ff-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid var(--ff-border); background: var(--ff-bg-secondary); color: var(--ff-text-secondary); margin-left: 8px; } .ff-tag.ff-tag-green { border-color: var(--ff-success); color: var(--ff-success); background: rgba(76,175,80,0.1); } .ff-tag.ff-tag-red { border-color: var(--ff-error); color: var(--ff-error); background: rgba(244,67,54,0.1); } .ff-tag.ff-tag-yellow { border-color: var(--ff-warning); color: var(--ff-warning); background: rgba(255,152,0,0.1); } .ff-tag.ff-tag-purple { border-color: var(--ff-accent); color: var(--ff-accent); background: rgba(108,92,231,0.1); } .ff-scrollbar::-webkit-scrollbar { width: 6px; } .ff-scrollbar::-webkit-scrollbar-track { background: transparent; } .ff-scrollbar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; } .ff-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; } .ff-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--ff-border); border-top-color: var(--ff-accent); border-radius: 50%; animation: ff-spin 0.6s linear infinite; } @keyframes ff-spin { to { transform: rotate(360deg); } } .ff-skeleton { background: linear-gradient(90deg, var(--ff-bg-tertiary) 25%, var(--ff-bg-hover) 50%, var(--ff-bg-tertiary) 75%); background-size: 200% 100%; animation: ff-shimmer 1.5s infinite; border-radius: 4px; } @keyframes ff-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } } #ff-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: none; flex-direction: column; justify-content: center; align-items: center; gap: 16px; } .ff-modal-overlay-active { display: flex !important; } .ff-modal { background: var(--ff-bg-tertiary); border-radius: var(--ff-radius-lg); box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid var(--ff-border); color: var(--ff-text-primary); z-index: 9999999; } .ff-modal.ff-modal-pop { animation: ff-popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; } .ff-modal.ff-modal-closing { animation: ff-fadeIn 0.2s ease reverse forwards; } .ff-modal.ff-modal-confirm { padding: 32px; max-width: 440px; width: 90%; } .ff-modal.ff-modal-custom { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; } .ff-modal-confirm-icon { text-align: center; margin-bottom: 16px; } .ff-modal-confirm-title { margin: 0 0 8px; font-size: 20px; font-weight: 600; text-align: center; } .ff-modal-confirm-msg { margin: 0 0 24px; font-size: 14px; color: var(--ff-text-secondary); text-align: center; line-height: 1.5; } .ff-modal-confirm-actions { display: flex; gap: 10px; justify-content: center; } @keyframes ff-fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes ff-popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } } #fluxfind-settings-btn { position: fixed; bottom: 20px; right: 20px; z-index: 99999; border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(108,92,231,0.4); background: var(--ff-accent); border: none; } .ff-toggle-wrapper { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding: 6px 0; } .ff-toggle-input { display: none; } .ff-toggle-track { position: relative; width: 44px; height: 24px; border-radius: 12px; background: #555; flex-shrink: 0; transition: background 0.25s ease; } .ff-toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); } .ff-toggle-input:checked + .ff-toggle-track { background: var(--ff-accent); } .ff-toggle-input:checked + .ff-toggle-track .ff-toggle-knob { transform: translateX(20px); } .ff-toggle-label { font-size: 13px; font-weight: 500; color: var(--ff-text-primary); line-height: 1.3; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-settings-header { padding: 20px 28px; border-bottom: 1px solid var(--ff-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; } .ff-settings-header-title { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; } .ff-settings-body { display: flex; flex: 1; overflow: hidden; min-height: 0; } .ff-settings-sidebar { width: 180px; padding: 16px 12px; border-right: 1px solid var(--ff-border); flex-shrink: 0; overflow-y: auto; } .ff-settings-sidebar-btn { width: 100%; justify-content: flex-start; margin-bottom: 4px; border: none; background: transparent; padding: 16px; } .ff-settings-sidebar-btn.ff-active { background: var(--ff-bg-hover); } .ff-settings-content { flex: 1; padding: 20px 28px; overflow-y: auto; } .ff-settings-home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; } .ff-settings-home-title { margin: 0; font-size: 22px; font-weight: 700; } .ff-settings-home-version { margin: 4px 0 0; font-size: 13px; color: var(--ff-text-muted); } .ff-settings-home-actions { display: flex; gap: 10px; margin-bottom: 20px; } .ff-settings-preset-title { font-size: 14px; font-weight: 600; margin: 16px 0 10px; } .ff-settings-preset-list { display: flex; flex-wrap: wrap; gap: 8px; } .ff-settings-section-title { font-size: 15px; font-weight: 600; margin: 0 0 14px; } .ff-settings-select-wrap { margin-bottom: 12px; } .ff-settings-select-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ff-text-secondary); } .ff-settings-about { text-align: center; padding: 20px 0; } .ff-settings-about-logo { margin-bottom: 16px; } .ff-settings-about-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; } .ff-settings-about-desc { margin: 0 0 16px; font-size: 13px; color: var(--ff-text-muted); line-height: 1.5; } .ff-settings-about-toggles { display: flex; gap: 16px; justify-content: center; } .ff-settings-about-footer { margin: 20px 0 0; font-size: 11px; color: var(--ff-text-muted); } .ff-server-controls { display: flex; gap: 8px; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; }';
 
     function injectAll() {
         if (CSS && CSS.length > 0 && CSS !== '/* CSS is embedded at build time from src/ui/css/*.css files */') {
@@ -3022,7 +2997,10 @@ const FluxFeatureServerBrowser = (() => {
         }, 1500);
     }
 
-    function openFilterPanel() {
+    async function openFilterPanel() {
+        // Trigger region scan so data is fresh when user picks a region
+        if (!regionScanDone) await scanAndCacheRegions();
+
         FluxModals.custom((modal, close) => {
             const regionBtns = '<button class="ff-btn ff-btn-sm ff-region-btn ff-active" data-region="">All Regions</button>' +
                 Object.entries(FluxConstants.SERVER_REGIONS)
@@ -3121,18 +3099,14 @@ const FluxFeatureServerBrowser = (() => {
         }
 
         FluxLogger.info('Server browser: waiting for DOM...');
-        await FluxUtils.watchForChild(
+        const container = await FluxUtils.watchForChild(
             '#game-instances, .tab-content, [class*="game-instances"]',
-            '#rbx-public-game-server-item-container, .card-list',
+            '#rbx-public-game-server-item-container',
             30000
-        ).catch(() => {
-            FluxLogger.info('Server browser: server container never appeared');
-            return null;
-        });
+        ).catch(() => null);
 
-        const container = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
         if (!container) {
-            FluxLogger.info('Server browser: still no container after watch');
+            FluxLogger.info('Server browser: server container never appeared');
             return;
         }
 
@@ -3140,7 +3114,12 @@ const FluxFeatureServerBrowser = (() => {
         injectFilterButtons();
         enhanceServerCards();
         observeServerList();
-        scanAndCacheRegions();
+
+        // Only auto-scan if user has "Auto Server Regions" enabled in settings
+        if (FluxStorage.getBool('autoserverregions', true)) {
+            scanAndCacheRegions();
+        }
+
         FluxLogger.info('Server browser: initialized');
     }
 
@@ -3681,4 +3660,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 21, JS lines: 3586
+// Total modules: 21, JS lines: 3565

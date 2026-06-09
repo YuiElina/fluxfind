@@ -165,7 +165,10 @@ const FluxFeatureServerBrowser = (() => {
         }, 1500);
     }
 
-    function openFilterPanel() {
+    async function openFilterPanel() {
+        // Trigger region scan so data is fresh when user picks a region
+        if (!regionScanDone) await scanAndCacheRegions();
+
         FluxModals.custom((modal, close) => {
             const regionBtns = '<button class="ff-btn ff-btn-sm ff-region-btn ff-active" data-region="">All Regions</button>' +
                 Object.entries(FluxConstants.SERVER_REGIONS)
@@ -264,18 +267,14 @@ const FluxFeatureServerBrowser = (() => {
         }
 
         FluxLogger.info('Server browser: waiting for DOM...');
-        await FluxUtils.watchForChild(
+        const container = await FluxUtils.watchForChild(
             '#game-instances, .tab-content, [class*="game-instances"]',
-            '#rbx-public-game-server-item-container, .card-list',
+            '#rbx-public-game-server-item-container',
             30000
-        ).catch(() => {
-            FluxLogger.info('Server browser: server container never appeared');
-            return null;
-        });
+        ).catch(() => null);
 
-        const container = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
         if (!container) {
-            FluxLogger.info('Server browser: still no container after watch');
+            FluxLogger.info('Server browser: server container never appeared');
             return;
         }
 
@@ -283,7 +282,12 @@ const FluxFeatureServerBrowser = (() => {
         injectFilterButtons();
         enhanceServerCards();
         observeServerList();
-        scanAndCacheRegions();
+
+        // Only auto-scan if user has "Auto Server Regions" enabled in settings
+        if (FluxStorage.getBool('autoserverregions', true)) {
+            scanAndCacheRegions();
+        }
+
         FluxLogger.info('Server browser: initialized');
     }
 
