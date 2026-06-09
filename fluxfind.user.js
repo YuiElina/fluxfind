@@ -54,7 +54,7 @@
 // ====== MODULE: utils (src/core/utils.js) ======
 /**
  * FluxFind Core Utilities
- * High-performance general utilities: debounce, throttle, memoize, batch DOM operations, waitForElement
+ * High-performance general utilities: debounce, throttle, memoize, batch DOM, MutationObserver helpers
  *
  * @module core/utils
  * @license GPL-2.0-only
@@ -145,16 +145,6 @@ const FluxUtils = (() => {
         return Array.from(root.querySelectorAll(selector));
     }
 
-    function observeDOM(target, config, callback) {
-        const observer = new MutationObserver((mutations) => {
-            observer.disconnect();
-            callback(mutations);
-            observer.observe(target, config);
-        });
-        observer.observe(target, config);
-        return observer;
-    }
-
     function chunk(array, size) {
         const chunks = [];
         for (let i = 0; i < array.length; i += size) {
@@ -213,30 +203,102 @@ const FluxUtils = (() => {
         return hash;
     }
 
-    /** Wait for a DOM element matching selector to appear, with timeout */
-    function waitForElement(selector, timeout = 5000) {
+    /**
+     * Watch a parent element for a child matching childSelector to appear.
+     * Uses childList-only observer on the parent — much faster than subtree:true on body.
+     * Returns a Promise that resolves with the child element.
+     * @param {string} parentSelector - The parent element to watch (e.g. '#game-instances')
+     * @param {string} childSelector  - The child to wait for (e.g. '#rbx-public-game-server-item-container')
+     * @param {number} timeout        - Max wait time in ms
+     */
+    function watchForChild(parentSelector, childSelector, timeout = 30000) {
         return new Promise((resolve, reject) => {
-            const found = document.querySelector(selector);
-            if (found) return resolve(found);
+            // First: check if already present (fast path)
+            const existing = document.querySelector(childSelector);
+            if (existing) { FluxLogger.info('watchForChild: already present: ' + childSelector); return resolve(existing); }
 
-            const observer = new MutationObserver(() => {
-                const el = document.querySelector(selector);
-                if (el) { observer.disconnect(); clearTimeout(timer); resolve(el); }
+            // Find the parent
+            const parent = document.querySelector(parentSelector);
+            if (!parent) {
+                FluxLogger.info('watchForChild: parent not found: ' + parentSelector);
+                return reject(new Error('Parent not found: ' + parentSelector));
+            }
+
+            FluxLogger.info('watchForChild: observing parent ' + parentSelector + ' for child ' + childSelector);
+
+            const observer = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    if (mutation.type === 'childList') {
+                        // Check added nodes
+                        for (const node of mutation.addedNodes) {
+                            if (node.nodeType === 1) {
+                                if (node.matches && node.matches(childSelector)) {
+                                    observer.disconnect();
+                                    clearTimeout(timer);
+                                    resolve(node);
+                                    return;
+                                }
+                                if (node.querySelector && node.querySelector(childSelector)) {
+                                    observer.disconnect();
+                                    clearTimeout(timer);
+                                    resolve(node.querySelector(childSelector));
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
             });
 
-            observer.observe(document.body, { childList: true, subtree: true });
+            observer.observe(parent, { childList: true, subtree: false });
 
             const timer = setTimeout(() => {
                 observer.disconnect();
-                reject(new Error(`Timeout waiting for: ${selector}`));
+                FluxLogger.info('watchForChild: timeout waiting for ' + childSelector);
+                reject(new Error('Timeout waiting for child: ' + childSelector));
+            }, timeout);
+        });
+    }
+
+    /**
+     * Watch a parent for a child to be REMOVED (like chat-container).
+     */
+    function watchForChildRemoval(parentSelector, childSelector, timeout = 30000) {
+        return new Promise((resolve, reject) => {
+            const existing = document.querySelector(childSelector);
+            if (!existing) { return resolve(); } // Already gone
+
+            const parent = existing.parentNode;
+            if (!parent) { return resolve(); }
+
+            const observer = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    if (mutation.type === 'childList') {
+                        for (const node of mutation.removedNodes) {
+                            if (node.nodeType === 1 && (node.matches && node.matches(childSelector) || node.querySelector && node.querySelector(childSelector))) {
+                                observer.disconnect();
+                                clearTimeout(timer);
+                                resolve();
+                                return;
+                            }
+                        }
+                    }
+                }
+            });
+
+            observer.observe(parent, { childList: true, subtree: false });
+
+            const timer = setTimeout(() => {
+                observer.disconnect();
+                reject(new Error('Timeout waiting for removal: ' + childSelector));
             }, timeout);
         });
     }
 
     return {
         debounce, throttle, memoize, batchAppend, qs, qsa,
-        observeDOM, chunk, retry, parallelLimit, lazy, once, fastHash,
-        waitForElement,
+        chunk, retry, parallelLimit, lazy, once, fastHash,
+        watchForChild, watchForChildRemoval,
         noop: () => {}
     };
 })();
@@ -2810,8 +2872,8 @@ const FluxRouter = (() => {
 // ====== MODULE: server-browser (src/features/server-browser.js) ======
 /**
  * FluxFind Server Browser Feature
- * Enhanced server list with filtering, region detection, quick-join, and vote display
- * Matches Roblox's current DOM: #rbx-public-game-server-item-container, .rbx-public-game-server-item
+ * Uses FluxUtils.watchForChild to wait for server list to appear inside the game-instances tab.
+ * Observes parent only (childList:true, subtree:false) for maximum performance.
  *
  * @module features/server-browser
  * @license GPL-2.0-only
@@ -2820,23 +2882,29 @@ const FluxFeatureServerBrowser = (() => {
     'use strict';
 
     let enabled = false, filterButtonAdded = false, serverCardsEnhanced = false, serverObserver = null;
-    let _regionSelect = null; // persisted reference for re-injection
 
-    function _getServerContainer() {
-        return FluxUtils.qs(FluxConstants.SELECTORS.SERVER_LIST);
-    }
-
-    function _getServerItems() {
-        return FluxUtils.qsa(FluxConstants.SELECTORS.SERVER_ITEM);
+    async function _waitForContainer() {
+        try {
+            // Watch the game-instances tab pane for the server container to appear
+            const el = await FluxUtils.watchForChild(
+                '#game-instances, .tab-content, [class*="game-instances"]',
+                '#rbx-public-game-server-item-container, .card-list',
+                30000
+            );
+            FluxLogger.info('Server container found via watchForChild: ' + (el.id || el.className));
+            return el;
+        } catch (e) {
+            FluxLogger.info('Server container not found: ' + e.message);
+            return null;
+        }
     }
 
     /* ====== Inject Controls ====== */
-    function injectFilterButtons() {
+    async function injectFilterButtons() {
         if (filterButtonAdded) return;
-        const list = _getServerContainer();
-        if (!list) return;
+        const container = await _waitForContainer();
+        if (!container) return;
 
-        // Remove old controls if SPA re-render left them
         const old = document.querySelector('.ff-server-controls');
         if (old) old.remove();
 
@@ -2852,14 +2920,13 @@ const FluxFeatureServerBrowser = (() => {
 
         const regionSelect = FluxDOM.el('select', {
             className: 'ff-select',
-            style: { padding: '0 8px', height: '28px', fontSize: '12px' },
+            style: 'padding:0 8px;height:28px;font-size:12px',
             onchange: (e) => handleRegionFilter(e.target.value)
         });
         regionSelect.appendChild(FluxDOM.el('option', { value: '', text: 'All Regions' }));
         Object.entries(FluxConstants.SERVER_REGIONS).forEach(([key, r]) => {
             regionSelect.appendChild(FluxDOM.el('option', { value: key, text: r.name }));
         });
-        _regionSelect = regionSelect;
 
         const quickJoinBtn = FluxDOM.el('button', {
             className: 'ff-btn ff-btn-sm ff-btn-primary',
@@ -2868,9 +2935,9 @@ const FluxFeatureServerBrowser = (() => {
         quickJoinBtn.innerHTML = FluxIcons.get('zap', { size: 14 }) + ' Quick Join';
 
         FluxUtils.batchAppend(btnContainer, [refreshBtn, filterBtn, regionSelect, quickJoinBtn]);
-        // Insert before the server <ul> so controls sit between .server-list-options and the list
-        list.parentNode.insertBefore(btnContainer, list);
+        container.parentNode.insertBefore(btnContainer, container);
         filterButtonAdded = true;
+        FluxLogger.info('Server controls injected');
 
         const savedRegion = FluxStorage.get('serverregionfilter');
         if (savedRegion) {
@@ -2881,7 +2948,7 @@ const FluxFeatureServerBrowser = (() => {
 
     function handleRegionFilter(code) {
         FluxStorage.set('serverregionfilter', code);
-        const items = _getServerItems();
+        const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
         if (!code) {
             items.forEach(i => { i.style.display = ''; });
             FluxNotifications.show('All regions', 'info', 1500);
@@ -2889,37 +2956,44 @@ const FluxFeatureServerBrowser = (() => {
         }
         const region = FluxConstants.SERVER_REGIONS[code];
         if (!region) return;
-        let hidden = 0;
         const needle = region.name.toLowerCase();
+        let hidden = 0;
         items.forEach(i => {
-            if (i.textContent.toLowerCase().includes(needle)) {
-                i.style.display = '';
-            } else {
-                i.style.display = 'none';
-                hidden++;
-            }
+            if (i.textContent.toLowerCase().includes(needle)) { i.style.display = ''; }
+            else { i.style.display = 'none'; hidden++; }
         });
         FluxNotifications.show(`${region.name}: ${items.length - hidden} servers`, 'info', 2000);
     }
 
     /* ====== Enhance Cards ====== */
-    function enhanceServerCards() {
+    async function enhanceServerCards() {
         if (serverCardsEnhanced) return;
-        const items = _getServerItems();
+
+        // Watch for server items to appear inside the container
+        try {
+            await FluxUtils.watchForChild(
+                '#rbx-public-game-server-item-container',
+                '.rbx-public-game-server-item',
+                15000
+            );
+        } catch (e) {
+            FluxLogger.info('Server items watch timeout');
+            return;
+        }
+
+        const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
         if (!items.length) return;
 
         items.forEach(item => {
             if (item.dataset.ffEnhanced) return;
             item.dataset.ffEnhanced = '1';
 
-            // Style the join button
-            const joinBtn = FluxUtils.qs(FluxConstants.SELECTORS.SERVER_JOIN_BTN, item);
+            const joinBtn = item.querySelector(FluxConstants.SELECTORS.SERVER_JOIN_BTN);
             if (joinBtn) {
                 joinBtn.classList.add('ff-btn', 'ff-btn-sm', 'ff-btn-primary');
             }
 
-            // Add player-count badge from status text
-            const statusEl = FluxUtils.qs(FluxConstants.SELECTORS.SERVER_STATUS, item);
+            const statusEl = item.querySelector(FluxConstants.SELECTORS.SERVER_STATUS);
             if (statusEl) {
                 const match = statusEl.textContent.match(/(\d+)\s*(?:of|\/)\s*(\d+)/);
                 if (match) {
@@ -2933,12 +3007,12 @@ const FluxFeatureServerBrowser = (() => {
             }
         });
         serverCardsEnhanced = true;
+        FluxLogger.info(`Enhanced ${items.length} server cards`);
     }
 
     function refreshServers() {
         FluxNotifications.show('Refreshing servers...', 'info', 2000);
-        // Try Roblox's native refresh button
-        const native = document.querySelector('[data-testid="game-servers-refresh-button"], button:has(svg)');
+        const native = document.querySelector('[data-testid="game-servers-refresh-button"], .rbx-refresh');
         if (native) native.click();
         serverCardsEnhanced = false;
         setTimeout(() => enhanceServerCards(), 1500);
@@ -2968,10 +3042,10 @@ const FluxFeatureServerBrowser = (() => {
     }
 
     function applyFilters({ hideFull, hideEmpty, minPlayers }) {
-        const items = _getServerItems();
+        const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
         let hidden = 0;
         items.forEach(item => {
-            const statusEl = FluxUtils.qs(FluxConstants.SELECTORS.SERVER_STATUS, item);
+            const statusEl = item.querySelector(FluxConstants.SELECTORS.SERVER_STATUS);
             if (!statusEl) return;
             const match = statusEl.textContent.match(/(\d+)\s*(?:of|\/)\s*(\d+)/);
             if (!match) return;
@@ -2986,62 +3060,51 @@ const FluxFeatureServerBrowser = (() => {
         FluxNotifications.show(`${hidden} servers hidden`, 'info');
     }
 
-    /* ====== Quick Join ====== */
     function quickJoinRandom() {
-        const items = _getServerItems();
-        const visible = items.filter(i => i.style.display !== 'none');
-        if (!visible.length) {
-            FluxNotifications.show('No servers available', 'warning');
-            return;
-        }
+        const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
+        const visible = Array.from(items).filter(i => i.style.display !== 'none');
+        if (!visible.length) { FluxNotifications.show('No servers available', 'warning'); return; }
         const pick = visible[Math.floor(Math.random() * visible.length)];
-        const btn = FluxUtils.qs(FluxConstants.SELECTORS.SERVER_JOIN_BTN, pick);
-        if (btn) {
-            FluxNotifications.show('Joining random server...', 'info', 2000);
-            btn.click();
-        }
+        const btn = pick.querySelector(FluxConstants.SELECTORS.SERVER_JOIN_BTN);
+        if (btn) { FluxNotifications.show('Joining random server...', 'info', 2000); btn.click(); }
     }
 
-    /* ====== Observer ====== */
     function observeServerList() {
-        const list = _getServerContainer();
-        if (!list) return;
+        const container = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
+        if (!container) return;
         if (serverObserver) serverObserver.disconnect();
 
-        const reapply = FluxUtils.debounce(() => {
-            injectFilterButtons();
+        serverObserver = new MutationObserver(FluxUtils.debounce(() => {
+            serverCardsEnhanced = false;
             enhanceServerCards();
-        }, 400);
+        }, 400));
 
-        serverObserver = new MutationObserver(reapply);
-        serverObserver.observe(list, { childList: true, subtree: true });
+        serverObserver.observe(container, { childList: true, subtree: false });
     }
 
-    /* ====== Init / Destroy ====== */
-    function init() {
-        // SPA navigation: reset flags so elements re-inject
+    async function init() {
         if (enabled) {
             filterButtonAdded = false;
             serverCardsEnhanced = false;
+            if (serverObserver) { serverObserver.disconnect(); serverObserver = null; }
         }
         if (!FluxStorage.getBool('togglefilterserversbutton', true)) return;
         enabled = true;
 
-        FluxLogger.info('Server browser feature initialized');
-        injectFilterButtons();
-        enhanceServerCards();
+        FluxLogger.info('Server browser: waiting via watchForChild...');
+        await injectFilterButtons();
+        await enhanceServerCards();
         observeServerList();
+        FluxLogger.info('Server browser: fully loaded');
     }
 
     function destroy() {
         enabled = false;
         filterButtonAdded = false;
         serverCardsEnhanced = false;
-        if (serverObserver) { serverObserver.disconnect();
-            serverObserver = null; }
+        if (serverObserver) { serverObserver.disconnect(); serverObserver = null; }
         const ctrl = document.querySelector('.ff-server-controls');
         if (ctrl) ctrl.remove();
-        _regionSelect = null;
     }
 
     return { init, destroy, injectFilterButtons, enhanceServerCards, refreshServers };
@@ -3476,39 +3539,14 @@ const FluxFeatureEnhancements = (() => {
 // ====== MODULE: app (src/app.js) ======
 /**
  * FluxFind Application Core
- * Main entry point - initializes all modules, manages feature lifecycle, handles URL routing
+ * Simple init sequence: run features once, then retry server-browser until DOM exists
  *
  * @module app
  * @license GPL-2.0-only
  */
-
 const FluxApp = (() => {
     'use strict';
-
     let initialized = false;
-    let currentPage = null;
-
-    // Feature registry with lazy activation
-    const FEATURES = {
-        adRemover: {
-            module: FluxFeatureAdRemover,
-            initKey: 'removeads',
-            initDefault: true
-        },
-        serverBrowser: {
-            module: FluxFeatureServerBrowser,
-            initKey: 'togglefilterserversbutton',
-            initDefault: true,
-            pages: ['servers', 'game']
-        },
-        enhancements: {
-            module: FluxFeatureEnhancements,
-            initKey: null,
-            initDefault: true
-        }
-    };
-
-    const activeFeatures = new Set();
 
     function init() {
         if (initialized) return;
@@ -3517,33 +3555,53 @@ const FluxApp = (() => {
         FluxLogger.init();
         FluxLogger.info(`FluxFind v${FluxConstants.VERSION} initializing...`);
 
-        // Migrate legacy settings first
         FluxStorage.migrateLegacy();
-
-        // Initialize default settings if missing
         FluxStorage.initDefaults(FluxConstants.DEFAULT_SETTINGS);
-
-        // Inject core styles
         FluxStyles.injectAll();
 
-        // Add settings button to the page
         injectSettingsButton();
-
-        // Start watching URL changes
         FluxRouter.start(handleRouteChange);
 
-        // Activate initial features based on current page
-        const page = FluxRouter.detectPage();
-        handleRouteChange(page, null);
+        // Always-on features: run once
+        if (FluxStorage.getBool('removeads', true)) {
+            FluxFeatureAdRemover.start();
+        }
+        FluxFeatureEnhancements.init();
 
-        // Apply global features
-        activateGlobalFeatures();
+        // Server browser: needs server list DOM which renders async
+        scheduleServerBrowser();
 
-        // Activate enhancements (handles all toggles internally)
-        activateFeature('enhancements', FEATURES.enhancements);
+        FluxLogger.info('FluxFind initialized');
+    }
 
-        FluxLogger.info('FluxFind initialized successfully');
-        FluxNotifications.show('FluxFind ready', 'success', 2000);
+    /** Retry server browser until its container appears (up to 30s) */
+    function scheduleServerBrowser() {
+        let attempts = 0;
+        const maxAttempts = 30;
+        const retry = () => {
+            attempts++;
+            if (!FluxStorage.getBool('togglefilterserversbutton', true)) return;
+            // Re-call init each time (it resets internal flags and waits for DOM)
+            FluxFeatureServerBrowser.init().catch(() => {});
+            if (attempts < maxAttempts) {
+                setTimeout(retry, 1000);
+            } else {
+                FluxLogger.info('Server browser: max retries reached');
+            }
+        };
+        retry();
+    }
+
+    function handleRouteChange(newPage, oldPage) {
+        if (newPage === oldPage) return;
+        FluxLogger.info(`Route: ${oldPage || 'init'} -> ${newPage}`);
+
+        // On game/servers page, re-trigger server browser
+        if (newPage === 'servers' || newPage === 'game') {
+            if (FluxStorage.getBool('togglefilterserversbutton', true)) {
+                FluxFeatureServerBrowser.init().catch(() => {});
+            }
+        }
     }
 
     function injectSettingsButton() {
@@ -3559,115 +3617,16 @@ const FluxApp = (() => {
         addButton();
     }
 
-    function handleRouteChange(newPage, oldPage) {
-        if (newPage === oldPage) return;
-        FluxLogger.debug(`Page changed: ${oldPage} -> ${newPage}`);
-        currentPage = newPage;
-
-        // Deactivate page-specific features from old page
-        if (oldPage) deactivatePageFeatures(oldPage);
-
-        // Activate features for new page
-        activatePageFeatures(newPage);
-    }
-
-    function activatePageFeatures(page) {
-        for (const [name, config] of Object.entries(FEATURES)) {
-            if (config.pages && config.pages.includes(page)) {
-                if (FluxStorage.getBool(config.initKey, config.initDefault)) {
-                    activateFeature(name, config);
-                }
-            }
-        }
-
-        // Page-specific initialization
-        switch (page) {
-            case 'servers':
-            case 'game':
-                if (FluxStorage.getBool('togglefilterserversbutton', true)) {
-                    FluxFeatureServerBrowser.init();
-                }
-                break;
-            case 'home':
-                FluxLogger.debug('Home page detected');
-                break;
+    function applySettings(key) {
+        // Re-run server browser on toggle
+        if (key === 'togglefilterserversbutton') {
+            scheduleServerBrowser();
         }
     }
 
-    function deactivatePageFeatures(page) {
-        activeFeatures.forEach(name => {
-            const config = FEATURES[name];
-            if (config && config.pages && !config.pages.includes(currentPage)) {
-                deactivateFeature(name, config);
-            }
-        });
-    }
-
-    function activateGlobalFeatures() {
-        // Ad remover runs on all pages
-        if (FluxStorage.getBool('removeads', true)) {
-            activateFeature('adRemover', FEATURES.adRemover);
-        }
-    }
-
-    function activateFeature(name, config) {
-        if (activeFeatures.has(name)) return;
-        FluxLogger.debug(`Activating feature: ${name}`);
-        if (config.module && typeof config.module.init === 'function') {
-            config.module.init();
-        } else if (config.module && typeof config.module.start === 'function') {
-            config.module.start();
-        }
-        activeFeatures.add(name);
-    }
-
-    function deactivateFeature(name, config) {
-        if (!activeFeatures.has(name)) return;
-        FluxLogger.debug(`Deactivating feature: ${name}`);
-        if (config.module && typeof config.module.destroy === 'function') {
-            config.module.destroy();
-        } else if (config.module && typeof config.module.stop === 'function') {
-            config.module.stop();
-        }
-        activeFeatures.delete(name);
-    }
-
-    function applySettings(key, value) {
-        FluxLogger.debug(`Settings changed: ${key} -> ${value}`);
-
-        const settingsToFeatures = {
-            removeads: 'adRemover',
-            togglefilterserversbutton: 'serverBrowser'
-        };
-
-        const featureName = settingsToFeatures[key];
-        if (featureName && FEATURES[featureName]) {
-            if (value) {
-                activateFeature(featureName, FEATURES[featureName]);
-            } else {
-                deactivateFeature(featureName, FEATURES[featureName]);
-            }
-        }
-
-        // Handle UI settings immediately
-        if (key === 'forcedarkmode' || key === 'smallerrobloxsidebar') {
-            FluxNotifications.show('Setting applied. Refresh for full effect.', 'info', 3000);
-        }
-    }
-
-    function getCurrentPage() {
-        return currentPage;
-    }
-
-    return {
-        init,
-        applySettings,
-        getCurrentPage,
-        handleRouteChange
-    };
+    return { init, applySettings };
 })();
 
-// Auto-initialize when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', FluxApp.init);
 } else {
@@ -3676,4 +3635,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 21, JS lines: 3581
+// Total modules: 21, JS lines: 3540

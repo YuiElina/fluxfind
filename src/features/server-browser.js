@@ -1,7 +1,7 @@
 /**
  * FluxFind Server Browser Feature
- * Enhanced server list with filtering, region detection, quick-join, and vote display
- * Matches Roblox's current DOM: #rbx-public-game-server-item-container, .rbx-public-game-server-item
+ * Uses FluxUtils.watchForChild to wait for server list to appear inside the game-instances tab.
+ * Observes parent only (childList:true, subtree:false) for maximum performance.
  *
  * @module features/server-browser
  * @license GPL-2.0-only
@@ -10,23 +10,29 @@ const FluxFeatureServerBrowser = (() => {
     'use strict';
 
     let enabled = false, filterButtonAdded = false, serverCardsEnhanced = false, serverObserver = null;
-    let _regionSelect = null; // persisted reference for re-injection
 
-    function _getServerContainer() {
-        return FluxUtils.qs(FluxConstants.SELECTORS.SERVER_LIST);
-    }
-
-    function _getServerItems() {
-        return FluxUtils.qsa(FluxConstants.SELECTORS.SERVER_ITEM);
+    async function _waitForContainer() {
+        try {
+            // Watch the game-instances tab pane for the server container to appear
+            const el = await FluxUtils.watchForChild(
+                '#game-instances, .tab-content, [class*="game-instances"]',
+                '#rbx-public-game-server-item-container, .card-list',
+                30000
+            );
+            FluxLogger.info('Server container found via watchForChild: ' + (el.id || el.className));
+            return el;
+        } catch (e) {
+            FluxLogger.info('Server container not found: ' + e.message);
+            return null;
+        }
     }
 
     /* ====== Inject Controls ====== */
-    function injectFilterButtons() {
+    async function injectFilterButtons() {
         if (filterButtonAdded) return;
-        const list = _getServerContainer();
-        if (!list) return;
+        const container = await _waitForContainer();
+        if (!container) return;
 
-        // Remove old controls if SPA re-render left them
         const old = document.querySelector('.ff-server-controls');
         if (old) old.remove();
 
@@ -42,14 +48,13 @@ const FluxFeatureServerBrowser = (() => {
 
         const regionSelect = FluxDOM.el('select', {
             className: 'ff-select',
-            style: { padding: '0 8px', height: '28px', fontSize: '12px' },
+            style: 'padding:0 8px;height:28px;font-size:12px',
             onchange: (e) => handleRegionFilter(e.target.value)
         });
         regionSelect.appendChild(FluxDOM.el('option', { value: '', text: 'All Regions' }));
         Object.entries(FluxConstants.SERVER_REGIONS).forEach(([key, r]) => {
             regionSelect.appendChild(FluxDOM.el('option', { value: key, text: r.name }));
         });
-        _regionSelect = regionSelect;
 
         const quickJoinBtn = FluxDOM.el('button', {
             className: 'ff-btn ff-btn-sm ff-btn-primary',
@@ -58,9 +63,9 @@ const FluxFeatureServerBrowser = (() => {
         quickJoinBtn.innerHTML = FluxIcons.get('zap', { size: 14 }) + ' Quick Join';
 
         FluxUtils.batchAppend(btnContainer, [refreshBtn, filterBtn, regionSelect, quickJoinBtn]);
-        // Insert before the server <ul> so controls sit between .server-list-options and the list
-        list.parentNode.insertBefore(btnContainer, list);
+        container.parentNode.insertBefore(btnContainer, container);
         filterButtonAdded = true;
+        FluxLogger.info('Server controls injected');
 
         const savedRegion = FluxStorage.get('serverregionfilter');
         if (savedRegion) {
@@ -71,7 +76,7 @@ const FluxFeatureServerBrowser = (() => {
 
     function handleRegionFilter(code) {
         FluxStorage.set('serverregionfilter', code);
-        const items = _getServerItems();
+        const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
         if (!code) {
             items.forEach(i => { i.style.display = ''; });
             FluxNotifications.show('All regions', 'info', 1500);
@@ -79,37 +84,44 @@ const FluxFeatureServerBrowser = (() => {
         }
         const region = FluxConstants.SERVER_REGIONS[code];
         if (!region) return;
-        let hidden = 0;
         const needle = region.name.toLowerCase();
+        let hidden = 0;
         items.forEach(i => {
-            if (i.textContent.toLowerCase().includes(needle)) {
-                i.style.display = '';
-            } else {
-                i.style.display = 'none';
-                hidden++;
-            }
+            if (i.textContent.toLowerCase().includes(needle)) { i.style.display = ''; }
+            else { i.style.display = 'none'; hidden++; }
         });
         FluxNotifications.show(`${region.name}: ${items.length - hidden} servers`, 'info', 2000);
     }
 
     /* ====== Enhance Cards ====== */
-    function enhanceServerCards() {
+    async function enhanceServerCards() {
         if (serverCardsEnhanced) return;
-        const items = _getServerItems();
+
+        // Watch for server items to appear inside the container
+        try {
+            await FluxUtils.watchForChild(
+                '#rbx-public-game-server-item-container',
+                '.rbx-public-game-server-item',
+                15000
+            );
+        } catch (e) {
+            FluxLogger.info('Server items watch timeout');
+            return;
+        }
+
+        const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
         if (!items.length) return;
 
         items.forEach(item => {
             if (item.dataset.ffEnhanced) return;
             item.dataset.ffEnhanced = '1';
 
-            // Style the join button
-            const joinBtn = FluxUtils.qs(FluxConstants.SELECTORS.SERVER_JOIN_BTN, item);
+            const joinBtn = item.querySelector(FluxConstants.SELECTORS.SERVER_JOIN_BTN);
             if (joinBtn) {
                 joinBtn.classList.add('ff-btn', 'ff-btn-sm', 'ff-btn-primary');
             }
 
-            // Add player-count badge from status text
-            const statusEl = FluxUtils.qs(FluxConstants.SELECTORS.SERVER_STATUS, item);
+            const statusEl = item.querySelector(FluxConstants.SELECTORS.SERVER_STATUS);
             if (statusEl) {
                 const match = statusEl.textContent.match(/(\d+)\s*(?:of|\/)\s*(\d+)/);
                 if (match) {
@@ -123,12 +135,12 @@ const FluxFeatureServerBrowser = (() => {
             }
         });
         serverCardsEnhanced = true;
+        FluxLogger.info(`Enhanced ${items.length} server cards`);
     }
 
     function refreshServers() {
         FluxNotifications.show('Refreshing servers...', 'info', 2000);
-        // Try Roblox's native refresh button
-        const native = document.querySelector('[data-testid="game-servers-refresh-button"], button:has(svg)');
+        const native = document.querySelector('[data-testid="game-servers-refresh-button"], .rbx-refresh');
         if (native) native.click();
         serverCardsEnhanced = false;
         setTimeout(() => enhanceServerCards(), 1500);
@@ -158,10 +170,10 @@ const FluxFeatureServerBrowser = (() => {
     }
 
     function applyFilters({ hideFull, hideEmpty, minPlayers }) {
-        const items = _getServerItems();
+        const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
         let hidden = 0;
         items.forEach(item => {
-            const statusEl = FluxUtils.qs(FluxConstants.SELECTORS.SERVER_STATUS, item);
+            const statusEl = item.querySelector(FluxConstants.SELECTORS.SERVER_STATUS);
             if (!statusEl) return;
             const match = statusEl.textContent.match(/(\d+)\s*(?:of|\/)\s*(\d+)/);
             if (!match) return;
@@ -176,62 +188,51 @@ const FluxFeatureServerBrowser = (() => {
         FluxNotifications.show(`${hidden} servers hidden`, 'info');
     }
 
-    /* ====== Quick Join ====== */
     function quickJoinRandom() {
-        const items = _getServerItems();
-        const visible = items.filter(i => i.style.display !== 'none');
-        if (!visible.length) {
-            FluxNotifications.show('No servers available', 'warning');
-            return;
-        }
+        const items = document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM);
+        const visible = Array.from(items).filter(i => i.style.display !== 'none');
+        if (!visible.length) { FluxNotifications.show('No servers available', 'warning'); return; }
         const pick = visible[Math.floor(Math.random() * visible.length)];
-        const btn = FluxUtils.qs(FluxConstants.SELECTORS.SERVER_JOIN_BTN, pick);
-        if (btn) {
-            FluxNotifications.show('Joining random server...', 'info', 2000);
-            btn.click();
-        }
+        const btn = pick.querySelector(FluxConstants.SELECTORS.SERVER_JOIN_BTN);
+        if (btn) { FluxNotifications.show('Joining random server...', 'info', 2000); btn.click(); }
     }
 
-    /* ====== Observer ====== */
     function observeServerList() {
-        const list = _getServerContainer();
-        if (!list) return;
+        const container = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
+        if (!container) return;
         if (serverObserver) serverObserver.disconnect();
 
-        const reapply = FluxUtils.debounce(() => {
-            injectFilterButtons();
+        serverObserver = new MutationObserver(FluxUtils.debounce(() => {
+            serverCardsEnhanced = false;
             enhanceServerCards();
-        }, 400);
+        }, 400));
 
-        serverObserver = new MutationObserver(reapply);
-        serverObserver.observe(list, { childList: true, subtree: true });
+        serverObserver.observe(container, { childList: true, subtree: false });
     }
 
-    /* ====== Init / Destroy ====== */
-    function init() {
-        // SPA navigation: reset flags so elements re-inject
+    async function init() {
         if (enabled) {
             filterButtonAdded = false;
             serverCardsEnhanced = false;
+            if (serverObserver) { serverObserver.disconnect(); serverObserver = null; }
         }
         if (!FluxStorage.getBool('togglefilterserversbutton', true)) return;
         enabled = true;
 
-        FluxLogger.info('Server browser feature initialized');
-        injectFilterButtons();
-        enhanceServerCards();
+        FluxLogger.info('Server browser: waiting via watchForChild...');
+        await injectFilterButtons();
+        await enhanceServerCards();
         observeServerList();
+        FluxLogger.info('Server browser: fully loaded');
     }
 
     function destroy() {
         enabled = false;
         filterButtonAdded = false;
         serverCardsEnhanced = false;
-        if (serverObserver) { serverObserver.disconnect();
-            serverObserver = null; }
+        if (serverObserver) { serverObserver.disconnect(); serverObserver = null; }
         const ctrl = document.querySelector('.ff-server-controls');
         if (ctrl) ctrl.remove();
-        _regionSelect = null;
     }
 
     return { init, destroy, injectFilterButtons, enhanceServerCards, refreshServers };

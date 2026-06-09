@@ -1,6 +1,6 @@
 /**
  * FluxFind Core Utilities
- * High-performance general utilities: debounce, throttle, memoize, batch DOM operations, waitForElement
+ * High-performance general utilities: debounce, throttle, memoize, batch DOM, MutationObserver helpers
  *
  * @module core/utils
  * @license GPL-2.0-only
@@ -91,16 +91,6 @@ const FluxUtils = (() => {
         return Array.from(root.querySelectorAll(selector));
     }
 
-    function observeDOM(target, config, callback) {
-        const observer = new MutationObserver((mutations) => {
-            observer.disconnect();
-            callback(mutations);
-            observer.observe(target, config);
-        });
-        observer.observe(target, config);
-        return observer;
-    }
-
     function chunk(array, size) {
         const chunks = [];
         for (let i = 0; i < array.length; i += size) {
@@ -159,30 +149,102 @@ const FluxUtils = (() => {
         return hash;
     }
 
-    /** Wait for a DOM element matching selector to appear, with timeout */
-    function waitForElement(selector, timeout = 5000) {
+    /**
+     * Watch a parent element for a child matching childSelector to appear.
+     * Uses childList-only observer on the parent — much faster than subtree:true on body.
+     * Returns a Promise that resolves with the child element.
+     * @param {string} parentSelector - The parent element to watch (e.g. '#game-instances')
+     * @param {string} childSelector  - The child to wait for (e.g. '#rbx-public-game-server-item-container')
+     * @param {number} timeout        - Max wait time in ms
+     */
+    function watchForChild(parentSelector, childSelector, timeout = 30000) {
         return new Promise((resolve, reject) => {
-            const found = document.querySelector(selector);
-            if (found) return resolve(found);
+            // First: check if already present (fast path)
+            const existing = document.querySelector(childSelector);
+            if (existing) { FluxLogger.info('watchForChild: already present: ' + childSelector); return resolve(existing); }
 
-            const observer = new MutationObserver(() => {
-                const el = document.querySelector(selector);
-                if (el) { observer.disconnect(); clearTimeout(timer); resolve(el); }
+            // Find the parent
+            const parent = document.querySelector(parentSelector);
+            if (!parent) {
+                FluxLogger.info('watchForChild: parent not found: ' + parentSelector);
+                return reject(new Error('Parent not found: ' + parentSelector));
+            }
+
+            FluxLogger.info('watchForChild: observing parent ' + parentSelector + ' for child ' + childSelector);
+
+            const observer = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    if (mutation.type === 'childList') {
+                        // Check added nodes
+                        for (const node of mutation.addedNodes) {
+                            if (node.nodeType === 1) {
+                                if (node.matches && node.matches(childSelector)) {
+                                    observer.disconnect();
+                                    clearTimeout(timer);
+                                    resolve(node);
+                                    return;
+                                }
+                                if (node.querySelector && node.querySelector(childSelector)) {
+                                    observer.disconnect();
+                                    clearTimeout(timer);
+                                    resolve(node.querySelector(childSelector));
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
             });
 
-            observer.observe(document.body, { childList: true, subtree: true });
+            observer.observe(parent, { childList: true, subtree: false });
 
             const timer = setTimeout(() => {
                 observer.disconnect();
-                reject(new Error(`Timeout waiting for: ${selector}`));
+                FluxLogger.info('watchForChild: timeout waiting for ' + childSelector);
+                reject(new Error('Timeout waiting for child: ' + childSelector));
+            }, timeout);
+        });
+    }
+
+    /**
+     * Watch a parent for a child to be REMOVED (like chat-container).
+     */
+    function watchForChildRemoval(parentSelector, childSelector, timeout = 30000) {
+        return new Promise((resolve, reject) => {
+            const existing = document.querySelector(childSelector);
+            if (!existing) { return resolve(); } // Already gone
+
+            const parent = existing.parentNode;
+            if (!parent) { return resolve(); }
+
+            const observer = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    if (mutation.type === 'childList') {
+                        for (const node of mutation.removedNodes) {
+                            if (node.nodeType === 1 && (node.matches && node.matches(childSelector) || node.querySelector && node.querySelector(childSelector))) {
+                                observer.disconnect();
+                                clearTimeout(timer);
+                                resolve();
+                                return;
+                            }
+                        }
+                    }
+                }
+            });
+
+            observer.observe(parent, { childList: true, subtree: false });
+
+            const timer = setTimeout(() => {
+                observer.disconnect();
+                reject(new Error('Timeout waiting for removal: ' + childSelector));
             }, timeout);
         });
     }
 
     return {
         debounce, throttle, memoize, batchAppend, qs, qsa,
-        observeDOM, chunk, retry, parallelLimit, lazy, once, fastHash,
-        waitForElement,
+        chunk, retry, parallelLimit, lazy, once, fastHash,
+        watchForChild, watchForChildRemoval,
         noop: () => {}
     };
 })();

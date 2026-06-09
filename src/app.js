@@ -1,38 +1,13 @@
 /**
  * FluxFind Application Core
- * Main entry point - initializes all modules, manages feature lifecycle, handles URL routing
+ * Simple init sequence: run features once, then retry server-browser until DOM exists
  *
  * @module app
  * @license GPL-2.0-only
  */
-
 const FluxApp = (() => {
     'use strict';
-
     let initialized = false;
-    let currentPage = null;
-
-    // Feature registry with lazy activation
-    const FEATURES = {
-        adRemover: {
-            module: FluxFeatureAdRemover,
-            initKey: 'removeads',
-            initDefault: true
-        },
-        serverBrowser: {
-            module: FluxFeatureServerBrowser,
-            initKey: 'togglefilterserversbutton',
-            initDefault: true,
-            pages: ['servers', 'game']
-        },
-        enhancements: {
-            module: FluxFeatureEnhancements,
-            initKey: null,
-            initDefault: true
-        }
-    };
-
-    const activeFeatures = new Set();
 
     function init() {
         if (initialized) return;
@@ -41,33 +16,53 @@ const FluxApp = (() => {
         FluxLogger.init();
         FluxLogger.info(`FluxFind v${FluxConstants.VERSION} initializing...`);
 
-        // Migrate legacy settings first
         FluxStorage.migrateLegacy();
-
-        // Initialize default settings if missing
         FluxStorage.initDefaults(FluxConstants.DEFAULT_SETTINGS);
-
-        // Inject core styles
         FluxStyles.injectAll();
 
-        // Add settings button to the page
         injectSettingsButton();
-
-        // Start watching URL changes
         FluxRouter.start(handleRouteChange);
 
-        // Activate initial features based on current page
-        const page = FluxRouter.detectPage();
-        handleRouteChange(page, null);
+        // Always-on features: run once
+        if (FluxStorage.getBool('removeads', true)) {
+            FluxFeatureAdRemover.start();
+        }
+        FluxFeatureEnhancements.init();
 
-        // Apply global features
-        activateGlobalFeatures();
+        // Server browser: needs server list DOM which renders async
+        scheduleServerBrowser();
 
-        // Activate enhancements (handles all toggles internally)
-        activateFeature('enhancements', FEATURES.enhancements);
+        FluxLogger.info('FluxFind initialized');
+    }
 
-        FluxLogger.info('FluxFind initialized successfully');
-        FluxNotifications.show('FluxFind ready', 'success', 2000);
+    /** Retry server browser until its container appears (up to 30s) */
+    function scheduleServerBrowser() {
+        let attempts = 0;
+        const maxAttempts = 30;
+        const retry = () => {
+            attempts++;
+            if (!FluxStorage.getBool('togglefilterserversbutton', true)) return;
+            // Re-call init each time (it resets internal flags and waits for DOM)
+            FluxFeatureServerBrowser.init().catch(() => {});
+            if (attempts < maxAttempts) {
+                setTimeout(retry, 1000);
+            } else {
+                FluxLogger.info('Server browser: max retries reached');
+            }
+        };
+        retry();
+    }
+
+    function handleRouteChange(newPage, oldPage) {
+        if (newPage === oldPage) return;
+        FluxLogger.info(`Route: ${oldPage || 'init'} -> ${newPage}`);
+
+        // On game/servers page, re-trigger server browser
+        if (newPage === 'servers' || newPage === 'game') {
+            if (FluxStorage.getBool('togglefilterserversbutton', true)) {
+                FluxFeatureServerBrowser.init().catch(() => {});
+            }
+        }
     }
 
     function injectSettingsButton() {
@@ -83,115 +78,16 @@ const FluxApp = (() => {
         addButton();
     }
 
-    function handleRouteChange(newPage, oldPage) {
-        if (newPage === oldPage) return;
-        FluxLogger.debug(`Page changed: ${oldPage} -> ${newPage}`);
-        currentPage = newPage;
-
-        // Deactivate page-specific features from old page
-        if (oldPage) deactivatePageFeatures(oldPage);
-
-        // Activate features for new page
-        activatePageFeatures(newPage);
-    }
-
-    function activatePageFeatures(page) {
-        for (const [name, config] of Object.entries(FEATURES)) {
-            if (config.pages && config.pages.includes(page)) {
-                if (FluxStorage.getBool(config.initKey, config.initDefault)) {
-                    activateFeature(name, config);
-                }
-            }
-        }
-
-        // Page-specific initialization
-        switch (page) {
-            case 'servers':
-            case 'game':
-                if (FluxStorage.getBool('togglefilterserversbutton', true)) {
-                    FluxFeatureServerBrowser.init();
-                }
-                break;
-            case 'home':
-                FluxLogger.debug('Home page detected');
-                break;
+    function applySettings(key) {
+        // Re-run server browser on toggle
+        if (key === 'togglefilterserversbutton') {
+            scheduleServerBrowser();
         }
     }
 
-    function deactivatePageFeatures(page) {
-        activeFeatures.forEach(name => {
-            const config = FEATURES[name];
-            if (config && config.pages && !config.pages.includes(currentPage)) {
-                deactivateFeature(name, config);
-            }
-        });
-    }
-
-    function activateGlobalFeatures() {
-        // Ad remover runs on all pages
-        if (FluxStorage.getBool('removeads', true)) {
-            activateFeature('adRemover', FEATURES.adRemover);
-        }
-    }
-
-    function activateFeature(name, config) {
-        if (activeFeatures.has(name)) return;
-        FluxLogger.debug(`Activating feature: ${name}`);
-        if (config.module && typeof config.module.init === 'function') {
-            config.module.init();
-        } else if (config.module && typeof config.module.start === 'function') {
-            config.module.start();
-        }
-        activeFeatures.add(name);
-    }
-
-    function deactivateFeature(name, config) {
-        if (!activeFeatures.has(name)) return;
-        FluxLogger.debug(`Deactivating feature: ${name}`);
-        if (config.module && typeof config.module.destroy === 'function') {
-            config.module.destroy();
-        } else if (config.module && typeof config.module.stop === 'function') {
-            config.module.stop();
-        }
-        activeFeatures.delete(name);
-    }
-
-    function applySettings(key, value) {
-        FluxLogger.debug(`Settings changed: ${key} -> ${value}`);
-
-        const settingsToFeatures = {
-            removeads: 'adRemover',
-            togglefilterserversbutton: 'serverBrowser'
-        };
-
-        const featureName = settingsToFeatures[key];
-        if (featureName && FEATURES[featureName]) {
-            if (value) {
-                activateFeature(featureName, FEATURES[featureName]);
-            } else {
-                deactivateFeature(featureName, FEATURES[featureName]);
-            }
-        }
-
-        // Handle UI settings immediately
-        if (key === 'forcedarkmode' || key === 'smallerrobloxsidebar') {
-            FluxNotifications.show('Setting applied. Refresh for full effect.', 'info', 3000);
-        }
-    }
-
-    function getCurrentPage() {
-        return currentPage;
-    }
-
-    return {
-        init,
-        applySettings,
-        getCurrentPage,
-        handleRouteChange
-    };
+    return { init, applySettings };
 })();
 
-// Auto-initialize when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', FluxApp.init);
 } else {
