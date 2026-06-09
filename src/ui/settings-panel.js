@@ -12,6 +12,8 @@ const FluxSettingsPanel = (() => {
 
     let isOpen = false;
 
+    const SECTIONS = ['home', 'appearance', 'servers', 'filters', 'privacy', 'about'];
+
     /* ============ Toggle Switch Generator (Apple‑style) ============ */
 
     function _createToggle(label, storageKey, defaultValue = false) {
