@@ -2312,6 +2312,8 @@ const FluxSettingsPanel = (() => {
 
     let isOpen = false;
 
+    const SECTIONS = ['home', 'appearance', 'servers', 'filters', 'privacy', 'about'];
+
     /* ============ Toggle Switch Generator (Apple‑style) ============ */
 
     function _createToggle(label, storageKey, defaultValue = false) {
@@ -3282,4 +3284,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 20, JS lines: 3189
+// Total modules: 20, JS lines: 3191
