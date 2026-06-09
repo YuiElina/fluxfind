@@ -50,7 +50,7 @@ const FluxConstants = (() => {
     };
 
     const SELECTORS = {
-        SERVER_LIST: '#rbx-running-games-list, [data-testid="game-servers-container"]',
+        SERVER_LIST: '#rbx-running-games-list, [data-testid="game-servers-container"], .server-list-options',
         SERVER_ITEM: '.game-server-item, [role="listitem"]',
         GAME_PAGE: 'div[data-testid="game-detail-page"]',
         USER_DATA_META: 'meta[name="user-data"]',
