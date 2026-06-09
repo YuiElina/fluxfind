@@ -35,15 +35,59 @@ const FluxFeatureServerBrowser = (() => {
         });
         filterBtn.innerHTML = `${FluxIcons.get('filter', { size: 14 })} Filters`;
 
+        // Server region dropdown
+        const regionSelect = FluxDOM.el('select', {
+            className: 'ff-select',
+            style: { padding: '0 8px', height: '28px', fontSize: '12px' },
+            onchange: (e) => handleRegionFilter(e.target.value)
+        });
+        const defaultOpt = FluxDOM.el('option', { value: '' });
+        defaultOpt.textContent = 'All Regions';
+        regionSelect.appendChild(defaultOpt);
+        Object.entries(FluxConstants.SERVER_REGIONS).forEach(([key, region]) => {
+            const opt = FluxDOM.el('option', { value: key });
+            opt.textContent = region.name;
+            regionSelect.appendChild(opt);
+        });
+
         const quickJoinBtn = FluxDOM.el('button', {
             className: 'ff-btn ff-btn-sm ff-btn-primary',
             onclick: () => quickJoinRandom()
         });
         quickJoinBtn.innerHTML = `${FluxIcons.get('zap', { size: 14 })} Quick Join`;
 
-        FluxUtils.batchAppend(btnContainer, [refreshBtn, filterBtn, quickJoinBtn]);
+        FluxUtils.batchAppend(btnContainer, [refreshBtn, filterBtn, regionSelect, quickJoinBtn]);
         serverContainer.parentNode.insertBefore(btnContainer, serverContainer);
         filterButtonAdded = true;
+
+        // Auto-apply saved region filter
+        const savedRegion = FluxStorage.get('serverregionfilter');
+        if (savedRegion) {
+            regionSelect.value = savedRegion;
+            handleRegionFilter(savedRegion);
+        }
+    }
+
+    function handleRegionFilter(regionCode) {
+        FluxStorage.set('serverregionfilter', regionCode);
+        const items = FluxUtils.qsa(FluxConstants.SELECTORS.SERVER_ITEM);
+        let hidden = 0;
+        if (!regionCode) {
+            items.forEach(item => { item.style.display = ''; });
+            FluxNotifications.show('Showing all regions', 'info', 1500);
+            return;
+        }
+        const region = FluxConstants.SERVER_REGIONS[regionCode];
+        if (!region) return;
+        items.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            const regionNameLower = region.name.toLowerCase();
+            // Check if server card mentions region name or nearby location
+            const found = text.includes(regionNameLower);
+            if (!found) { item.style.display = 'none';
+                hidden++; } else { item.style.display = ''; }
+        });
+        FluxNotifications.show(`${region.name}: ${items.length - hidden} servers found`, 'info', 2000);
     }
 
     /**
