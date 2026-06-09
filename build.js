@@ -55,6 +55,7 @@ const SOURCES = [
     'src/features/ad-remover.js',
     'src/features/url-router.js',
     'src/features/server-browser.js',
+    'src/features/enhancements.js',
 
     // Main application (must be last — auto-initializes)
     'src/app.js'
