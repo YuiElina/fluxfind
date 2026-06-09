@@ -7,6 +7,53 @@
     background: var(--ff-accent); border: none;
 }
 
+/* === Apple-style Toggle Switch === */
+.ff-toggle-wrapper {
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer; user-select: none; padding: 6px 0;
+}
+.ff-toggle-input { display: none; }
+.ff-toggle-track {
+    position: relative; width: 44px; height: 24px;
+    border-radius: 12px; background: #555;
+    flex-shrink: 0; transition: background 0.25s ease;
+}
+.ff-toggle-knob {
+    position: absolute; top: 2px; left: 2px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ff-toggle-input:checked + .ff-toggle-track { background: var(--ff-accent); }
+.ff-toggle-input:checked + .ff-toggle-track .ff-toggle-knob {
+    transform: translateX(20px);
+}
+.ff-toggle-label {
+    font-size: 13px; font-weight: 500;
+    color: var(--ff-text-primary); line-height: 1.3;
+}
+
+/* === Legacy checkbox (kept for filter panel) === */
+.ff-checkbox-wrapper {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; user-select: none;
+}
+.ff-checkbox-wrapper input[type="checkbox"] { display: none; }
+.ff-checkbox-custom {
+    width: 18px; height: 18px; border-radius: 4px;
+    border: 2px solid var(--ff-border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all var(--ff-transition);
+}
+.ff-checkbox-wrapper input:checked + .ff-checkbox-custom {
+    background: var(--ff-accent); border-color: var(--ff-accent);
+}
+.ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after {
+    content: ''; width: 5px; height: 9px;
+    border: solid #fff; border-width: 0 2px 2px 0;
+    transform: rotate(45deg); margin-top: -1px;
+}
+
 /* === Settings Panel Layout === */
 .ff-settings-header {
     padding: 20px 28px; border-bottom: 1px solid var(--ff-border);
@@ -48,5 +95,5 @@
 .ff-settings-about-logo { margin-bottom: 16px; }
 .ff-settings-about-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; }
 .ff-settings-about-desc { margin: 0 0 16px; font-size: 13px; color: var(--ff-text-muted); line-height: 1.5; }
-.ff-settings-about-toggles { display: flex; gap: 8px; justify-content: center; }
+.ff-settings-about-toggles { display: flex; gap: 16px; justify-content: center; }
 .ff-settings-about-footer { margin: 20px 0 0; font-size: 11px; color: var(--ff-text-muted); }
