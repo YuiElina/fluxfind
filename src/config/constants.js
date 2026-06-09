@@ -50,8 +50,11 @@ const FluxConstants = (() => {
     };
 
     const SELECTORS = {
-        SERVER_LIST: '#rbx-running-games-list, [data-testid="game-servers-container"], .server-list-options',
-        SERVER_ITEM: '.game-server-item, [role="listitem"]',
+        SERVER_LIST: '#rbx-public-game-server-item-container, #rbx-running-games-list, [data-testid="game-servers-container"]',
+        SERVER_ITEM: '.rbx-public-game-server-item, .game-server-item, [role="listitem"]',
+        SERVER_OPTIONS: '.server-list-options',
+        SERVER_JOIN_BTN: '.rbx-public-game-server-join, .game-server-join-btn',
+        SERVER_STATUS: '.rbx-game-status, .rbx-public-game-server-status, .text-overflow',
         GAME_PAGE: 'div[data-testid="game-detail-page"]',
         USER_DATA_META: 'meta[name="user-data"]',
         CSRF_META: 'meta[name="csrf-token"]',
