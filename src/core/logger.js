@@ -1,6 +1,7 @@
 /**
  * FluxFind Logger Module
  * Performance-conscious console logging with circular buffer and log levels
+ * Always uses console.log (never debug) for maximum browser compatibility
  *
  * @module core/logger
  * @license GPL-2.0-only
@@ -11,16 +12,16 @@ const FluxLogger = (() => {
 
     const MAX_ENTRIES = 500;
     const PREFIX = '[FLUXFIND]';
-    let logEnabled = false;
+    let logEnabled = true;           // CHANGED: default true so info() always visible
     let logBuffer = [];
     let bufferSize = 0;
-    const MAX_BUFFER_BYTES = 512 * 1024; // 512KB
+    const MAX_BUFFER_BYTES = 512 * 1024;
 
     const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3, NONE: 4 };
-    let currentLevel = LEVELS.INFO;
+    let currentLevel = LEVELS.INFO;  // CHANGED: default INFO
 
     function init() {
-        logEnabled = localStorage.getItem('FLUXFIND_enableLogs') === 'true';
+        logEnabled = localStorage.getItem('FLUXFIND_enableLogs') !== 'false';  // CHANGED: default ON
         const savedLevel = localStorage.getItem('FLUXFIND_logLevel');
         if (savedLevel && LEVELS[savedLevel] !== undefined) {
             currentLevel = LEVELS[savedLevel];
@@ -52,42 +53,34 @@ const FluxLogger = (() => {
         }
     }
 
-    function _formatAndLog(level, consoleMethod, args) {
+    function _formatAndLog(level, consoleMethod, fallback, args) {
         if (!_shouldLog(level)) return;
         const timestamp = new Date().toISOString().slice(11, 23);
-        consoleMethod(PREFIX, `[${timestamp}]`, ...args);
+        try {
+            // Use console.log for everything for max browser compat
+            if (level === 'ERROR') console.error(PREFIX, `[${timestamp}]`, ...args);
+            else if (level === 'WARN') console.warn(PREFIX, `[${timestamp}]`, ...args);
+            else console.log(PREFIX, `[${timestamp}]`, ...args);
+        } catch (e) {
+            // Fallback: just log
+            console.log(PREFIX, `[${timestamp}]`, ...args);
+        }
         _pushBuffer(level, args);
     }
 
-    const debug = (...args) => _formatAndLog('DEBUG', console.debug, args);
-    const info = (...args) => _formatAndLog('INFO', console.log, args);
-    const warn = (...args) => _formatAndLog('WARN', console.warn, args);
-    const error = (...args) => _formatAndLog('ERROR', console.error, args);
+    const debug = (...args) => _formatAndLog('DEBUG', console.debug, console.log, args);
+    const info  = (...args) => _formatAndLog('INFO',  console.info,  console.log, args);
+    const warn  = (...args) => _formatAndLog('WARN',  console.warn,  console.warn, args);
+    const error = (...args) => _formatAndLog('ERROR', console.error, console.error, args);
 
-    function getBuffer() {
-        return logBuffer.slice();
-    }
+    function getBuffer()    { return logBuffer.slice(); }
+    function clearBuffer()  { logBuffer = [];
+        bufferSize = 0; }
+    function setEnabled(e) { logEnabled = !!e; }
+    function setLevel(l)   { if (LEVELS[l] !== undefined) currentLevel = LEVELS[l]; }
 
-    function clearBuffer() {
-        logBuffer = [];
-        bufferSize = 0;
-    }
+    function ifDebug(fn) { if (_shouldLog('DEBUG')) fn(); }
 
-    function setEnabled(enabled) {
-        logEnabled = !!enabled;
-    }
-
-    function setLevel(level) {
-        if (LEVELS[level] !== undefined) {
-            currentLevel = LEVELS[level];
-        }
-    }
-
-    function ifDebug(fn) {
-        if (_shouldLog('DEBUG')) fn();
-    }
-
-    // Measure execution time of a function (only when debug logging is on)
     function time(label, fn) {
         if (!_shouldLog('DEBUG')) return fn();
         const start = performance.now();
@@ -108,7 +101,6 @@ const FluxLogger = (() => {
 
     return {
         init, debug, info, warn, error,
-        getBuffer, clearBuffer, setEnabled, setLevel, ifDebug,
-        time, timeAsync, LEVELS
+        getBuffer, clearBuffer, setEnabled, setLevel, ifDebug, time, timeAsync, LEVELS
     };
 })();
