@@ -2135,7 +2135,7 @@ const FluxStyles = (() => {
      * The compiled CSS string — replaced by build.js with actual CSS content.
      * Each line is a single-quoted string joined with newlines.
      */
-    const CSS = ':root { --ff-bg-primary: #1f1f1f; --ff-bg-secondary: #252525; --ff-bg-tertiary: #2a2a2a; --ff-bg-hover: #333333; --ff-border: #404040; --ff-border-light: #505050; --ff-text-primary: #e8e8e8; --ff-text-secondary: #b0b0b0; --ff-text-muted: #888888; --ff-accent: #6C5CE7; --ff-accent-hover: #7C6CF7; --ff-success: #4CAF50; --ff-error: #F44336; --ff-warning: #FF9800; --ff-radius-sm: 6px; --ff-radius-md: 8px; --ff-radius-lg: 12px; --ff-radius-xl: 20px; --ff-shadow: 0 4px 16px rgba(0,0,0,0.3); --ff-shadow-lg: 0 8px 32px rgba(0,0,0,0.4); --ff-transition: 0.15s ease; --ff-transition-slow: 0.25s ease; } .ff-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--ff-radius-sm); font: 500 13px -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; cursor: pointer; border: 1px solid var(--ff-border); background: var(--ff-bg-tertiary); color: var(--ff-text-primary); transition: background var(--ff-transition), border-color var(--ff-transition); outline: none; white-space: nowrap; line-height: 1.2; } .ff-btn:hover { background: var(--ff-bg-hover); border-color: var(--ff-border-light); } .ff-btn:active { transform: scale(0.97); } .ff-btn.ff-btn-primary { background: var(--ff-accent); border-color: var(--ff-accent); color: #fff; } .ff-btn.ff-btn-primary:hover { background: var(--ff-accent-hover); } .ff-btn.ff-btn-danger { border-color: var(--ff-error); color: var(--ff-error); } .ff-btn.ff-btn-danger:hover { background: rgba(244,67,54,0.1); } .ff-btn-sm { padding: 4px 10px; font-size: 12px; } .ff-btn-lg { padding: 10px 20px; font-size: 14px; } .ff-input, .ff-select { padding: 8px 12px; border-radius: var(--ff-radius-sm); border: 1px solid var(--ff-border); background: var(--ff-bg-primary); color: var(--ff-text-primary); font-size: 13px; transition: border-color var(--ff-transition); outline: none; } .ff-input:focus, .ff-select:focus { border-color: var(--ff-accent); } .ff-input { width: 100%; box-sizing: border-box; } .ff-select { cursor: pointer; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-tooltip { position: relative; } .ff-tooltip::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #333; color: #e8e8e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 9999; } .ff-tooltip:hover::after { opacity: 1; } .ff-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--ff-accent); color: #fff; line-height: 1.4; } .ff-divider { height: 1px; background: var(--ff-border); margin: 12px 0; border: none; } .ff-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid var(--ff-border); background: var(--ff-bg-secondary); color: var(--ff-text-secondary); margin-left: 8px; } .ff-tag.ff-tag-green { border-color: var(--ff-success); color: var(--ff-success); background: rgba(76,175,80,0.1); } .ff-tag.ff-tag-red { border-color: var(--ff-error); color: var(--ff-error); background: rgba(244,67,54,0.1); } .ff-tag.ff-tag-yellow { border-color: var(--ff-warning); color: var(--ff-warning); background: rgba(255,152,0,0.1); } .ff-tag.ff-tag-purple { border-color: var(--ff-accent); color: var(--ff-accent); background: rgba(108,92,231,0.1); } .ff-scrollbar::-webkit-scrollbar { width: 6px; } .ff-scrollbar::-webkit-scrollbar-track { background: transparent; } .ff-scrollbar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; } .ff-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; } .ff-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--ff-border); border-top-color: var(--ff-accent); border-radius: 50%; animation: ff-spin 0.6s linear infinite; } @keyframes ff-spin { to { transform: rotate(360deg); } } .ff-skeleton { background: linear-gradient(90deg, var(--ff-bg-tertiary) 25%, var(--ff-bg-hover) 50%, var(--ff-bg-tertiary) 75%); background-size: 200% 100%; animation: ff-shimmer 1.5s infinite; border-radius: 4px; } @keyframes ff-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } } #ff-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: none; justify-content: center; align-items: center; } .ff-modal { background: var(--ff-bg-tertiary); border-radius: var(--ff-radius-lg); box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid var(--ff-border); color: var(--ff-text-primary); z-index: 9999999; } .ff-modal.ff-modal-pop { animation: ff-popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; } .ff-modal.ff-modal-closing { animation: ff-fadeIn 0.2s ease reverse forwards; } .ff-modal.ff-modal-confirm { padding: 32px; max-width: 440px; width: 90%; } .ff-modal.ff-modal-custom { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; } .ff-modal-confirm-icon { text-align: center; margin-bottom: 16px; } .ff-modal-confirm-title { margin: 0 0 8px; font-size: 20px; font-weight: 600; text-align: center; } .ff-modal-confirm-msg { margin: 0 0 24px; font-size: 14px; color: var(--ff-text-secondary); text-align: center; line-height: 1.5; } .ff-modal-confirm-actions { display: flex; gap: 10px; justify-content: center; } @keyframes ff-fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes ff-popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } } #fluxfind-settings-btn { position: fixed; bottom: 20px; right: 20px; z-index: 99999; border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(108,92,231,0.4); background: var(--ff-accent); border: none; } .ff-settings-header { padding: 20px 28px; border-bottom: 1px solid var(--ff-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; } .ff-settings-header-title { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; } .ff-settings-body { display: flex; flex: 1; overflow: hidden; min-height: 0; } .ff-settings-sidebar { width: 180px; padding: 16px 12px; border-right: 1px solid var(--ff-border); flex-shrink: 0; overflow-y: auto; } .ff-settings-sidebar-btn { width: 100%; justify-content: flex-start; margin-bottom: 4px; border: none; background: transparent; } .ff-settings-sidebar-btn.ff-active { background: var(--ff-bg-hover); } .ff-settings-content { flex: 1; padding: 20px 28px; overflow-y: auto; } .ff-settings-home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; } .ff-settings-home-title { margin: 0; font-size: 22px; font-weight: 700; } .ff-settings-home-version { margin: 4px 0 0; font-size: 13px; color: var(--ff-text-muted); } .ff-settings-home-actions { display: flex; gap: 10px; margin-bottom: 20px; } .ff-settings-preset-title { font-size: 14px; font-weight: 600; margin: 16px 0 10px; } .ff-settings-preset-list { display: flex; flex-wrap: wrap; gap: 8px; } .ff-settings-section-title { font-size: 15px; font-weight: 600; margin: 0 0 14px; } .ff-settings-select-wrap { margin-bottom: 12px; } .ff-settings-select-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ff-text-secondary); } .ff-settings-about { text-align: center; padding: 20px 0; } .ff-settings-about-logo { margin-bottom: 16px; } .ff-settings-about-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; } .ff-settings-about-desc { margin: 0 0 16px; font-size: 13px; color: var(--ff-text-muted); line-height: 1.5; } .ff-settings-about-toggles { display: flex; gap: 8px; justify-content: center; } .ff-settings-about-footer { margin: 20px 0 0; font-size: 11px; color: var(--ff-text-muted); } .ff-server-controls { display: flex; gap: 8px; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; }';
+    const CSS = ':root { --ff-bg-primary: #1f1f1f; --ff-bg-secondary: #252525; --ff-bg-tertiary: #2a2a2a; --ff-bg-hover: #333333; --ff-border: #404040; --ff-border-light: #505050; --ff-text-primary: #e8e8e8; --ff-text-secondary: #b0b0b0; --ff-text-muted: #888888; --ff-accent: #6C5CE7; --ff-accent-hover: #7C6CF7; --ff-success: #4CAF50; --ff-error: #F44336; --ff-warning: #FF9800; --ff-radius-sm: 6px; --ff-radius-md: 8px; --ff-radius-lg: 12px; --ff-radius-xl: 20px; --ff-shadow: 0 4px 16px rgba(0,0,0,0.3); --ff-shadow-lg: 0 8px 32px rgba(0,0,0,0.4); --ff-transition: 0.15s ease; --ff-transition-slow: 0.25s ease; } .ff-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--ff-radius-sm); font: 500 13px -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; cursor: pointer; border: 1px solid var(--ff-border); background: var(--ff-bg-tertiary); color: var(--ff-text-primary); transition: background var(--ff-transition), border-color var(--ff-transition); outline: none; white-space: nowrap; line-height: 1.2; } .ff-btn:hover { background: var(--ff-bg-hover); border-color: var(--ff-border-light); } .ff-btn:active { transform: scale(0.97); } .ff-btn.ff-btn-primary { background: var(--ff-accent); border-color: var(--ff-accent); color: #fff; } .ff-btn.ff-btn-primary:hover { background: var(--ff-accent-hover); } .ff-btn.ff-btn-danger { border-color: var(--ff-error); color: var(--ff-error); } .ff-btn.ff-btn-danger:hover { background: rgba(244,67,54,0.1); } .ff-btn-sm { padding: 4px 10px; font-size: 12px; } .ff-btn-lg { padding: 10px 20px; font-size: 14px; } .ff-input, .ff-select { padding: 8px 12px; border-radius: var(--ff-radius-sm); border: 1px solid var(--ff-border); background: var(--ff-bg-primary); color: var(--ff-text-primary); font-size: 13px; transition: border-color var(--ff-transition); outline: none; } .ff-input:focus, .ff-select:focus { border-color: var(--ff-accent); } .ff-input { width: 100%; box-sizing: border-box; } .ff-select { cursor: pointer; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-tooltip { position: relative; } .ff-tooltip::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #333; color: #e8e8e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 9999; } .ff-tooltip:hover::after { opacity: 1; } .ff-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--ff-accent); color: #fff; line-height: 1.4; } .ff-divider { height: 1px; background: var(--ff-border); margin: 12px 0; border: none; } .ff-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid var(--ff-border); background: var(--ff-bg-secondary); color: var(--ff-text-secondary); margin-left: 8px; } .ff-tag.ff-tag-green { border-color: var(--ff-success); color: var(--ff-success); background: rgba(76,175,80,0.1); } .ff-tag.ff-tag-red { border-color: var(--ff-error); color: var(--ff-error); background: rgba(244,67,54,0.1); } .ff-tag.ff-tag-yellow { border-color: var(--ff-warning); color: var(--ff-warning); background: rgba(255,152,0,0.1); } .ff-tag.ff-tag-purple { border-color: var(--ff-accent); color: var(--ff-accent); background: rgba(108,92,231,0.1); } .ff-scrollbar::-webkit-scrollbar { width: 6px; } .ff-scrollbar::-webkit-scrollbar-track { background: transparent; } .ff-scrollbar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; } .ff-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; } .ff-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--ff-border); border-top-color: var(--ff-accent); border-radius: 50%; animation: ff-spin 0.6s linear infinite; } @keyframes ff-spin { to { transform: rotate(360deg); } } .ff-skeleton { background: linear-gradient(90deg, var(--ff-bg-tertiary) 25%, var(--ff-bg-hover) 50%, var(--ff-bg-tertiary) 75%); background-size: 200% 100%; animation: ff-shimmer 1.5s infinite; border-radius: 4px; } @keyframes ff-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } } #ff-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: none; justify-content: center; align-items: center; } .ff-modal { background: var(--ff-bg-tertiary); border-radius: var(--ff-radius-lg); box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid var(--ff-border); color: var(--ff-text-primary); z-index: 9999999; } .ff-modal.ff-modal-pop { animation: ff-popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; } .ff-modal.ff-modal-closing { animation: ff-fadeIn 0.2s ease reverse forwards; } .ff-modal.ff-modal-confirm { padding: 32px; max-width: 440px; width: 90%; } .ff-modal.ff-modal-custom { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; } .ff-modal-confirm-icon { text-align: center; margin-bottom: 16px; } .ff-modal-confirm-title { margin: 0 0 8px; font-size: 20px; font-weight: 600; text-align: center; } .ff-modal-confirm-msg { margin: 0 0 24px; font-size: 14px; color: var(--ff-text-secondary); text-align: center; line-height: 1.5; } .ff-modal-confirm-actions { display: flex; gap: 10px; justify-content: center; } @keyframes ff-fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes ff-popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } } #fluxfind-settings-btn { position: fixed; bottom: 20px; right: 20px; z-index: 99999; border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(108,92,231,0.4); background: var(--ff-accent); border: none; } .ff-toggle-wrapper { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding: 6px 0; } .ff-toggle-input { display: none; } .ff-toggle-track { position: relative; width: 44px; height: 24px; border-radius: 12px; background: #555; flex-shrink: 0; transition: background 0.25s ease; } .ff-toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); } .ff-toggle-input:checked + .ff-toggle-track { background: var(--ff-accent); } .ff-toggle-input:checked + .ff-toggle-track .ff-toggle-knob { transform: translateX(20px); } .ff-toggle-label { font-size: 13px; font-weight: 500; color: var(--ff-text-primary); line-height: 1.3; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-settings-header { padding: 20px 28px; border-bottom: 1px solid var(--ff-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; } .ff-settings-header-title { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; } .ff-settings-body { display: flex; flex: 1; overflow: hidden; min-height: 0; } .ff-settings-sidebar { width: 180px; padding: 16px 12px; border-right: 1px solid var(--ff-border); flex-shrink: 0; overflow-y: auto; } .ff-settings-sidebar-btn { width: 100%; justify-content: flex-start; margin-bottom: 4px; border: none; background: transparent; } .ff-settings-sidebar-btn.ff-active { background: var(--ff-bg-hover); } .ff-settings-content { flex: 1; padding: 20px 28px; overflow-y: auto; } .ff-settings-home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; } .ff-settings-home-title { margin: 0; font-size: 22px; font-weight: 700; } .ff-settings-home-version { margin: 4px 0 0; font-size: 13px; color: var(--ff-text-muted); } .ff-settings-home-actions { display: flex; gap: 10px; margin-bottom: 20px; } .ff-settings-preset-title { font-size: 14px; font-weight: 600; margin: 16px 0 10px; } .ff-settings-preset-list { display: flex; flex-wrap: wrap; gap: 8px; } .ff-settings-section-title { font-size: 15px; font-weight: 600; margin: 0 0 14px; } .ff-settings-select-wrap { margin-bottom: 12px; } .ff-settings-select-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ff-text-secondary); } .ff-settings-about { text-align: center; padding: 20px 0; } .ff-settings-about-logo { margin-bottom: 16px; } .ff-settings-about-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; } .ff-settings-about-desc { margin: 0 0 16px; font-size: 13px; color: var(--ff-text-muted); line-height: 1.5; } .ff-settings-about-toggles { display: flex; gap: 16px; justify-content: center; } .ff-settings-about-footer { margin: 20px 0 0; font-size: 11px; color: var(--ff-text-muted); } .ff-server-controls { display: flex; gap: 8px; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; }';
 
     function injectAll() {
         if (CSS && CSS.length > 0 && CSS !== '/* CSS is embedded at build time from src/ui/css/*.css files */') {
@@ -2300,7 +2300,8 @@ const FluxModals = (() => {
 // ====== MODULE: settings-panel (src/ui/settings-panel.js) ======
 /**
  * FluxFind Settings Panel Module
- * Full settings UI with sections, presets, import/export, and live preview
+ * Full settings UI with sections, presets, import/export, and live preview.
+ * All event handling uses addEventListener — no inline onclick/onchange attributes.
  *
  * @module ui/settings-panel
  * @license GPL-2.0-only
@@ -2311,135 +2312,213 @@ const FluxSettingsPanel = (() => {
 
     let isOpen = false;
 
-    const SECTIONS = ['home', 'appearance', 'servers', 'filters', 'privacy', 'about'];
+    /* ============ Toggle Switch Generator (Apple‑style) ============ */
 
     function _createToggle(label, storageKey, defaultValue = false) {
         const currentValue = FluxStorage.getBool(storageKey, defaultValue);
-        return `
-            <label class="ff-checkbox-wrapper">
-                <input type="checkbox" ${currentValue ? 'checked' : ''}
-                    onchange="FluxStorage.setBool('${storageKey}', this.checked); FluxSettingsPanel._onSettingChange('${storageKey}', this.checked)">
-                <span class="ff-checkbox-custom"></span>
-                <span>${FluxSanitizer.escapeHtml(label)}</span>
-            </label>
-        `;
+        const wrapper = FluxDOM.el('label', { className: 'ff-toggle-wrapper' });
+
+        const input = FluxDOM.el('input', {
+            type: 'checkbox',
+            className: 'ff-toggle-input'
+        });
+        if (currentValue) input.checked = true;
+
+        input.addEventListener('change', function () {
+            FluxStorage.setBool(storageKey, this.checked);
+            FluxSettingsPanel._onSettingChange(storageKey, this.checked);
+        });
+
+        const track = FluxDOM.el('span', { className: 'ff-toggle-track' });
+        const knob = FluxDOM.el('span', { className: 'ff-toggle-knob' });
+        track.appendChild(knob);
+
+        const labelSpan = FluxDOM.el('span', { className: 'ff-toggle-label' });
+        labelSpan.textContent = label;
+
+        wrapper.appendChild(input);
+        wrapper.appendChild(track);
+        wrapper.appendChild(labelSpan);
+
+        return wrapper;
     }
+
+    /* ============ Select Generator ============ */
 
     function _createSelect(label, storageKey, options, defaultValue) {
         const currentValue = FluxStorage.get(storageKey, defaultValue);
-        const opts = options.map(o => {
-            const selected = o.value === currentValue ? 'selected' : '';
-            return `<option value="${o.value}" ${selected}>${FluxSanitizer.escapeHtml(o.label)}</option>`;
-        }).join('');
-        return `
-            <div class="ff-settings-select-wrap">
-                <label class="ff-settings-select-label">${FluxSanitizer.escapeHtml(label)}</label>
-                <select class="ff-select" style="width:100%;"
-                    onchange="FluxStorage.set('${storageKey}', this.value); FluxSettingsPanel._onSettingChange('${storageKey}', this.value)">
-                    ${opts}
-                </select>
-            </div>
-        `;
+        const container = FluxDOM.el('div', { className: 'ff-settings-select-wrap' });
+
+        const lbl = FluxDOM.el('label', { className: 'ff-settings-select-label' });
+        lbl.textContent = label;
+
+        const select = FluxDOM.el('select', {
+            className: 'ff-select',
+            style: { width: '100%' }
+        });
+
+        options.forEach(o => {
+            const opt = FluxDOM.el('option', { value: o.value });
+            opt.textContent = o.label;
+            if (o.value === currentValue) opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        select.addEventListener('change', function () {
+            FluxStorage.set(storageKey, this.value);
+            FluxSettingsPanel._onSettingChange(storageKey, this.value);
+        });
+
+        container.appendChild(lbl);
+        container.appendChild(select);
+        return container;
     }
 
+    /* ============ Button Generator ============ */
+
+    function _createButton(html, className, onClick) {
+        const btn = FluxDOM.el('button', { className: `ff-btn ${className}` });
+        btn.innerHTML = html;
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    /* ============ Section Content Renderers ============ */
+
     function _sectionHome() {
-        return `
-            <div class="ff-settings-home-header">
-                <div>${FluxIcons.getLogoSVG(56)}</div>
-                <div>
-                    <h2 class="ff-settings-home-title">FluxFind</h2>
-                    <p class="ff-settings-home-version">Version ${FluxConstants.VERSION}</p>
-                </div>
-            </div>
-            <div class="ff-divider"></div>
-            <div class="ff-settings-home-actions">
-                <button class="ff-btn" onclick="FluxSettingsPanel.exportSettings()">
-                    ${FluxIcons.get('download', { size: 16 })} Export
-                </button>
-                <button class="ff-btn" onclick="FluxSettingsPanel.importSettings()">
-                    ${FluxIcons.get('upload', { size: 16 })} Import
-                </button>
-                <button class="ff-btn ff-btn-danger" onclick="FluxSettingsPanel.resetSettings()">
-                    ${FluxIcons.get('trash', { size: 16 })} Reset
-                </button>
-            </div>
-            <h3 class="ff-settings-preset-title">Quick Presets</h3>
-            <div class="ff-settings-preset-list">
-                ${Object.entries(FluxConstants.PRESET_CONFIGURATIONS).map(([key, preset]) => `
-                    <button class="ff-btn ff-btn-sm" onclick="FluxSettingsPanel.applyPreset('${key}')">
-                        ${FluxSanitizer.escapeHtml(preset.name)}
-                    </button>
-                `).join('')}
-            </div>
-        `;
+        const frag = document.createDocumentFragment();
+
+        const header = FluxDOM.el('div', { className: 'ff-settings-home-header' });
+        const logoDiv = FluxDOM.el('div');
+        logoDiv.innerHTML = FluxIcons.getLogoSVG(56);
+        const infoDiv = FluxDOM.el('div');
+        const title = FluxDOM.el('h2', { className: 'ff-settings-home-title' });
+        title.textContent = 'FluxFind';
+        const ver = FluxDOM.el('p', { className: 'ff-settings-home-version' });
+        ver.textContent = `Version ${FluxConstants.VERSION}`;
+        infoDiv.appendChild(title);
+        infoDiv.appendChild(ver);
+        header.appendChild(logoDiv);
+        header.appendChild(infoDiv);
+        frag.appendChild(header);
+        frag.appendChild(FluxDOM.el('div', { className: 'ff-divider' }));
+
+        const actions = FluxDOM.el('div', { className: 'ff-settings-home-actions' });
+        actions.appendChild(_createButton(
+            `${FluxIcons.get('download', { size: 16 })} Export`, '',
+            () => FluxSettingsPanel.exportSettings()
+        ));
+        actions.appendChild(_createButton(
+            `${FluxIcons.get('upload', { size: 16 })} Import`, '',
+            () => FluxSettingsPanel.importSettings()
+        ));
+        actions.appendChild(_createButton(
+            `${FluxIcons.get('trash', { size: 16 })} Reset`, 'ff-btn-danger',
+            () => FluxSettingsPanel.resetSettings()
+        ));
+        frag.appendChild(actions);
+
+        const presetTitle = FluxDOM.el('h3', { className: 'ff-settings-preset-title' });
+        presetTitle.textContent = 'Quick Presets';
+        frag.appendChild(presetTitle);
+
+        const presetList = FluxDOM.el('div', { className: 'ff-settings-preset-list' });
+        Object.entries(FluxConstants.PRESET_CONFIGURATIONS).forEach(([key, preset]) => {
+            presetList.appendChild(_createButton(
+                FluxSanitizer.escapeHtml(preset.name), 'ff-btn-sm',
+                () => FluxSettingsPanel.applyPreset(key)
+            ));
+        });
+        frag.appendChild(presetList);
+
+        return frag;
     }
 
     function _sectionAppearance() {
-        return `
-            <h3 class="ff-settings-section-title">Appearance</h3>
-            ${_createToggle('Force Dark Mode', 'forcedarkmode')}
-            ${_createToggle('Responsive Game Cards', 'responsivegamecards', true)}
-            ${_createToggle('Smaller Roblox Sidebar', 'smallerrobloxsidebar')}
-            ${_createToggle('Restore Classic Terms', 'restoreclassicterms')}
-            ${_createToggle('Custom Backgrounds (Experimental)', 'custombackgrounds')}
-        `;
+        const frag = document.createDocumentFragment();
+        const title = FluxDOM.el('h3', { className: 'ff-settings-section-title' });
+        title.textContent = 'Appearance';
+        frag.appendChild(title);
+        frag.appendChild(_createToggle('Force Dark Mode', 'forcedarkmode'));
+        frag.appendChild(_createToggle('Responsive Game Cards', 'responsivegamecards', true));
+        frag.appendChild(_createToggle('Smaller Roblox Sidebar', 'smallerrobloxsidebar'));
+        frag.appendChild(_createToggle('Restore Classic Terms', 'restoreclassicterms'));
+        frag.appendChild(_createToggle('Custom Backgrounds (Experimental)', 'custombackgrounds'));
+        return frag;
     }
 
     function _sectionServers() {
-        return `
-            <h3 class="ff-settings-section-title">Server Options</h3>
-            ${_createToggle('Enable Server Filters Button', 'togglefilterserversbutton', true)}
-            ${_createToggle('Auto Server Regions', 'autoserverregions', true)}
-            ${_createToggle('Better Private Servers', 'betterprivateservers', true)}
-            ${_createSelect('Server Region Count', 'autoserverregionnumber', [
-                { value: '8', label: '8 Regions' },
-                { value: '16', label: '16 Regions (Default)' },
-                { value: '24', label: '24 Regions' },
-                { value: '32', label: '32 Regions' },
-                { value: '48', label: '48 Regions' }
-            ], '16')}
-            ${_createToggle('Show Server Join Time', 'showserverjointime')}
-            ${_createToggle('Track Recent Servers', 'trackrecentservers', true)}
-        `;
+        const frag = document.createDocumentFragment();
+        const title = FluxDOM.el('h3', { className: 'ff-settings-section-title' });
+        title.textContent = 'Server Options';
+        frag.appendChild(title);
+        frag.appendChild(_createToggle('Enable Server Filters Button', 'togglefilterserversbutton', true));
+        frag.appendChild(_createToggle('Auto Server Regions', 'autoserverregions', true));
+        frag.appendChild(_createToggle('Better Private Servers', 'betterprivateservers', true));
+        frag.appendChild(_createSelect('Server Region Count', 'autoserverregionnumber', [
+            { value: '8', label: '8 Regions' },
+            { value: '16', label: '16 Regions (Default)' },
+            { value: '24', label: '24 Regions' },
+            { value: '32', label: '32 Regions' },
+            { value: '48', label: '48 Regions' }
+        ], '16'));
+        frag.appendChild(_createToggle('Show Server Join Time', 'showserverjointime'));
+        frag.appendChild(_createToggle('Track Recent Servers', 'trackrecentservers', true));
+        return frag;
     }
 
     function _sectionFilters() {
-        return `
-            <h3 class="ff-settings-section-title">Filter Options</h3>
-            ${_createToggle('Remove Ads', 'removeads', true)}
-            ${_createToggle('Smart Search', 'smartsearch', true)}
-            ${_createToggle('Better Game Stats', 'bettergamestats', true)}
-            ${_createToggle('Quality Filter Games', 'qualityfiltergames')}
-            ${_createToggle('Quick Launch Games', 'quicklaunchgames', true)}
-        `;
+        const frag = document.createDocumentFragment();
+        const title = FluxDOM.el('h3', { className: 'ff-settings-section-title' });
+        title.textContent = 'Filter Options';
+        frag.appendChild(title);
+        frag.appendChild(_createToggle('Remove Ads', 'removeads', true));
+        frag.appendChild(_createToggle('Smart Search', 'smartsearch', true));
+        frag.appendChild(_createToggle('Better Game Stats', 'bettergamestats', true));
+        frag.appendChild(_createToggle('Quality Filter Games', 'qualityfiltergames'));
+        frag.appendChild(_createToggle('Quick Launch Games', 'quicklaunchgames', true));
+        return frag;
     }
 
     function _sectionPrivacy() {
-        return `
-            <h3 class="ff-settings-section-title">Privacy & Safety</h3>
-            ${_createToggle('Disable Chat Bar', 'disablechat')}
-            ${_createToggle('Better Friends Page', 'betterfriends')}
-            ${_createToggle('Show Better Profile Info', 'betterprofileinfo')}
-            ${_createToggle('Mute Toxic Players (Experimental)', 'mutetoxicplayers')}
-        `;
+        const frag = document.createDocumentFragment();
+        const title = FluxDOM.el('h3', { className: 'ff-settings-section-title' });
+        title.textContent = 'Privacy & Safety';
+        frag.appendChild(title);
+        frag.appendChild(_createToggle('Disable Chat Bar', 'disablechat'));
+        frag.appendChild(_createToggle('Better Friends Page', 'betterfriends'));
+        frag.appendChild(_createToggle('Show Better Profile Info', 'betterprofileinfo'));
+        frag.appendChild(_createToggle('Mute Toxic Players (Experimental)', 'mutetoxicplayers'));
+        return frag;
     }
 
     function _sectionAbout() {
-        return `
-            <div class="ff-settings-about">
-                <div class="ff-settings-about-logo">${FluxIcons.getLogoSVG(64)}</div>
-                <h3 class="ff-settings-about-title">FluxFind v${FluxConstants.VERSION}</h3>
-                <p class="ff-settings-about-desc">
-                    Enhanced Roblox server browser with filtering, region detection,<br>
-                    smart search, and quality-of-life improvements.
-                </p>
-                <div class="ff-settings-about-toggles">
-                    ${_createToggle('Enable Logs', 'enableLogs')}
-                    ${_createToggle('Show Notifications', 'enablenotifications', true)}
-                </div>
-                <p class="ff-settings-about-footer">Licensed under GPL-2.0-only. Free and open source software.</p>
-            </div>
-        `;
+        const frag = document.createDocumentFragment();
+        const wrap = FluxDOM.el('div', { className: 'ff-settings-about' });
+
+        const logoDiv = FluxDOM.el('div', { className: 'ff-settings-about-logo' });
+        logoDiv.innerHTML = FluxIcons.getLogoSVG(64);
+        wrap.appendChild(logoDiv);
+
+        const h3 = FluxDOM.el('h3', { className: 'ff-settings-about-title' });
+        h3.textContent = `FluxFind v${FluxConstants.VERSION}`;
+        wrap.appendChild(h3);
+
+        const desc = FluxDOM.el('p', { className: 'ff-settings-about-desc' });
+        desc.innerHTML = 'Enhanced Roblox server browser with filtering, region detection,<br>smart search, and quality-of-life improvements.';
+        wrap.appendChild(desc);
+
+        const toggles = FluxDOM.el('div', { className: 'ff-settings-about-toggles' });
+        toggles.appendChild(_createToggle('Enable Logs', 'enableLogs'));
+        toggles.appendChild(_createToggle('Show Notifications', 'enablenotifications', true));
+        wrap.appendChild(toggles);
+
+        const footer = FluxDOM.el('p', { className: 'ff-settings-about-footer' });
+        footer.textContent = 'Licensed under GPL-2.0-only. Free and open source software.';
+        wrap.appendChild(footer);
+
+        frag.appendChild(wrap);
+        return frag;
     }
 
     function _getSectionContent(section) {
@@ -2454,6 +2533,8 @@ const FluxSettingsPanel = (() => {
         return (map[section] || _sectionHome)();
     }
 
+    /* ============ Open Settings Panel ============ */
+
     function open() {
         if (isOpen) return;
         isOpen = true;
@@ -2467,19 +2548,22 @@ const FluxSettingsPanel = (() => {
 
         FluxModals.custom((modal, closeModal) => {
             const header = FluxDOM.el('div', { className: 'ff-settings-header' });
-            header.innerHTML = `
-                <h2 class="ff-settings-header-title">${FluxIcons.get('settings', { size: 18 })} Settings</h2>
-                <button class="ff-btn ff-btn-sm" id="ff-settings-close">${FluxIcons.get('close', { size: 16 })}</button>
-            `;
+            const headerTitle = FluxDOM.el('h2', { className: 'ff-settings-header-title' });
+            headerTitle.innerHTML = `${FluxIcons.get('settings', { size: 18 })} Settings`;
+            const closeBtn = FluxDOM.el('button', { className: 'ff-btn ff-btn-sm' });
+            closeBtn.innerHTML = FluxIcons.get('close', { size: 16 });
+            closeBtn.addEventListener('click', closeModal);
+            header.appendChild(headerTitle);
+            header.appendChild(closeBtn);
 
             const body = FluxDOM.el('div', { className: 'ff-settings-body' });
-
             const sidebar = FluxDOM.el('div', { className: 'ff-settings-sidebar' });
             const content = FluxDOM.el('div', {
                 id: 'ff-settings-content',
                 className: 'ff-settings-content ff-scrollbar'
             });
 
+            const sidebarBtns = [];
             SECTIONS.forEach((section, index) => {
                 const btn = FluxDOM.el('button', {
                     className: 'ff-btn ff-btn-sm ff-settings-sidebar-btn' + (index === 0 ? ' ff-active' : '')
@@ -2488,31 +2572,35 @@ const FluxSettingsPanel = (() => {
                     ${section.charAt(0).toUpperCase() + section.slice(1)}`;
                 btn.addEventListener('click', () => {
                     activeSection = section;
-                    content.innerHTML = _getSectionContent(section);
-                    sidebar.querySelectorAll('button').forEach((b, i) => {
-                        b.classList.toggle('ff-active', i === index);
+                    content.innerHTML = '';
+                    content.appendChild(_getSectionContent(section));
+                    sidebarBtns.forEach((b, i) => {
+                        b.classList.toggle('ff-active', i === SECTIONS.indexOf(section));
                     });
                 });
                 sidebar.appendChild(btn);
+                sidebarBtns.push(btn);
             });
 
-            content.innerHTML = _getSectionContent('home');
+            content.appendChild(_getSectionContent('home'));
             body.appendChild(sidebar);
             body.appendChild(content);
             modal.appendChild(header);
             modal.appendChild(body);
-
-            header.querySelector('#ff-settings-close').addEventListener('click', closeModal);
         }, { width: '700px', onClose: () => { isOpen = false; } });
     }
 
+    /* ============ Setting Change Callback ============ */
+
     function _onSettingChange(key, value) {
         FluxLogger.debug(`Setting changed: ${key} = ${value}`);
-        FluxNotifications.show(`Setting updated`, 'success', 1500);
+        FluxNotifications.show('Setting updated', 'success', 1500);
         if (typeof FluxApp !== 'undefined' && FluxApp.applySettings) {
             FluxApp.applySettings(key, value);
         }
     }
+
+    /* ============ Export / Import / Reset ============ */
 
     function exportSettings() {
         const keys = FluxStorage.listKeys();
@@ -2780,15 +2868,59 @@ const FluxFeatureServerBrowser = (() => {
         });
         filterBtn.innerHTML = `${FluxIcons.get('filter', { size: 14 })} Filters`;
 
+        // Server region dropdown
+        const regionSelect = FluxDOM.el('select', {
+            className: 'ff-select',
+            style: { padding: '0 8px', height: '28px', fontSize: '12px' },
+            onchange: (e) => handleRegionFilter(e.target.value)
+        });
+        const defaultOpt = FluxDOM.el('option', { value: '' });
+        defaultOpt.textContent = 'All Regions';
+        regionSelect.appendChild(defaultOpt);
+        Object.entries(FluxConstants.SERVER_REGIONS).forEach(([key, region]) => {
+            const opt = FluxDOM.el('option', { value: key });
+            opt.textContent = region.name;
+            regionSelect.appendChild(opt);
+        });
+
         const quickJoinBtn = FluxDOM.el('button', {
             className: 'ff-btn ff-btn-sm ff-btn-primary',
             onclick: () => quickJoinRandom()
         });
         quickJoinBtn.innerHTML = `${FluxIcons.get('zap', { size: 14 })} Quick Join`;
 
-        FluxUtils.batchAppend(btnContainer, [refreshBtn, filterBtn, quickJoinBtn]);
+        FluxUtils.batchAppend(btnContainer, [refreshBtn, filterBtn, regionSelect, quickJoinBtn]);
         serverContainer.parentNode.insertBefore(btnContainer, serverContainer);
         filterButtonAdded = true;
+
+        // Auto-apply saved region filter
+        const savedRegion = FluxStorage.get('serverregionfilter');
+        if (savedRegion) {
+            regionSelect.value = savedRegion;
+            handleRegionFilter(savedRegion);
+        }
+    }
+
+    function handleRegionFilter(regionCode) {
+        FluxStorage.set('serverregionfilter', regionCode);
+        const items = FluxUtils.qsa(FluxConstants.SELECTORS.SERVER_ITEM);
+        let hidden = 0;
+        if (!regionCode) {
+            items.forEach(item => { item.style.display = ''; });
+            FluxNotifications.show('Showing all regions', 'info', 1500);
+            return;
+        }
+        const region = FluxConstants.SERVER_REGIONS[regionCode];
+        if (!region) return;
+        items.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            const regionNameLower = region.name.toLowerCase();
+            // Check if server card mentions region name or nearby location
+            const found = text.includes(regionNameLower);
+            if (!found) { item.style.display = 'none';
+                hidden++; } else { item.style.display = ''; }
+        });
+        FluxNotifications.show(`${region.name}: ${items.length - hidden} servers found`, 'info', 2000);
     }
 
     /**
@@ -3150,4 +3282,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 20, JS lines: 3057
+// Total modules: 20, JS lines: 3189
