@@ -392,6 +392,7 @@ const FluxSanitizer = (() => {
 /**
  * FluxFind Logger Module
  * Performance-conscious console logging with circular buffer and log levels
+ * Always uses console.log (never debug) for maximum browser compatibility
  *
  * @module core/logger
  * @license GPL-2.0-only
@@ -402,16 +403,16 @@ const FluxLogger = (() => {
 
     const MAX_ENTRIES = 500;
     const PREFIX = '[FLUXFIND]';
-    let logEnabled = false;
+    let logEnabled = true;           // CHANGED: default true so info() always visible
     let logBuffer = [];
     let bufferSize = 0;
-    const MAX_BUFFER_BYTES = 512 * 1024; // 512KB
+    const MAX_BUFFER_BYTES = 512 * 1024;
 
     const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3, NONE: 4 };
-    let currentLevel = LEVELS.INFO;
+    let currentLevel = LEVELS.INFO;  // CHANGED: default INFO
 
     function init() {
-        logEnabled = localStorage.getItem('FLUXFIND_enableLogs') === 'true';
+        logEnabled = localStorage.getItem('FLUXFIND_enableLogs') !== 'false';  // CHANGED: default ON
         const savedLevel = localStorage.getItem('FLUXFIND_logLevel');
         if (savedLevel && LEVELS[savedLevel] !== undefined) {
             currentLevel = LEVELS[savedLevel];
@@ -443,42 +444,34 @@ const FluxLogger = (() => {
         }
     }
 
-    function _formatAndLog(level, consoleMethod, args) {
+    function _formatAndLog(level, consoleMethod, fallback, args) {
         if (!_shouldLog(level)) return;
         const timestamp = new Date().toISOString().slice(11, 23);
-        consoleMethod(PREFIX, `[${timestamp}]`, ...args);
+        try {
+            // Use console.log for everything for max browser compat
+            if (level === 'ERROR') console.error(PREFIX, `[${timestamp}]`, ...args);
+            else if (level === 'WARN') console.warn(PREFIX, `[${timestamp}]`, ...args);
+            else console.log(PREFIX, `[${timestamp}]`, ...args);
+        } catch (e) {
+            // Fallback: just log
+            console.log(PREFIX, `[${timestamp}]`, ...args);
+        }
         _pushBuffer(level, args);
     }
 
-    const debug = (...args) => _formatAndLog('DEBUG', console.debug, args);
-    const info = (...args) => _formatAndLog('INFO', console.log, args);
-    const warn = (...args) => _formatAndLog('WARN', console.warn, args);
-    const error = (...args) => _formatAndLog('ERROR', console.error, args);
+    const debug = (...args) => _formatAndLog('DEBUG', console.debug, console.log, args);
+    const info  = (...args) => _formatAndLog('INFO',  console.info,  console.log, args);
+    const warn  = (...args) => _formatAndLog('WARN',  console.warn,  console.warn, args);
+    const error = (...args) => _formatAndLog('ERROR', console.error, console.error, args);
 
-    function getBuffer() {
-        return logBuffer.slice();
-    }
+    function getBuffer()    { return logBuffer.slice(); }
+    function clearBuffer()  { logBuffer = [];
+        bufferSize = 0; }
+    function setEnabled(e) { logEnabled = !!e; }
+    function setLevel(l)   { if (LEVELS[l] !== undefined) currentLevel = LEVELS[l]; }
 
-    function clearBuffer() {
-        logBuffer = [];
-        bufferSize = 0;
-    }
+    function ifDebug(fn) { if (_shouldLog('DEBUG')) fn(); }
 
-    function setEnabled(enabled) {
-        logEnabled = !!enabled;
-    }
-
-    function setLevel(level) {
-        if (LEVELS[level] !== undefined) {
-            currentLevel = LEVELS[level];
-        }
-    }
-
-    function ifDebug(fn) {
-        if (_shouldLog('DEBUG')) fn();
-    }
-
-    // Measure execution time of a function (only when debug logging is on)
     function time(label, fn) {
         if (!_shouldLog('DEBUG')) return fn();
         const start = performance.now();
@@ -499,8 +492,7 @@ const FluxLogger = (() => {
 
     return {
         init, debug, info, warn, error,
-        getBuffer, clearBuffer, setEnabled, setLevel, ifDebug,
-        time, timeAsync, LEVELS
+        getBuffer, clearBuffer, setEnabled, setLevel, ifDebug, time, timeAsync, LEVELS
     };
 })();
 
@@ -2138,7 +2130,7 @@ const FluxStyles = (() => {
      * The compiled CSS string — replaced by build.js with actual CSS content.
      * Each line is a single-quoted string joined with newlines.
      */
-    const CSS = ':root { --ff-bg-primary: #1f1f1f; --ff-bg-secondary: #252525; --ff-bg-tertiary: #2a2a2a; --ff-bg-hover: #333333; --ff-border: #404040; --ff-border-light: #505050; --ff-text-primary: #e8e8e8; --ff-text-secondary: #b0b0b0; --ff-text-muted: #888888; --ff-accent: #6C5CE7; --ff-accent-hover: #7C6CF7; --ff-success: #4CAF50; --ff-error: #F44336; --ff-warning: #FF9800; --ff-radius-sm: 6px; --ff-radius-md: 8px; --ff-radius-lg: 12px; --ff-radius-xl: 20px; --ff-shadow: 0 4px 16px rgba(0,0,0,0.3); --ff-shadow-lg: 0 8px 32px rgba(0,0,0,0.4); --ff-transition: 0.15s ease; --ff-transition-slow: 0.25s ease; } .ff-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--ff-radius-sm); font: 500 13px -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; cursor: pointer; border: 1px solid var(--ff-border); background: var(--ff-bg-tertiary); color: var(--ff-text-primary); transition: background var(--ff-transition), border-color var(--ff-transition); outline: none; white-space: nowrap; line-height: 1.2; } .ff-btn:hover { background: var(--ff-bg-hover); border-color: var(--ff-border-light); } .ff-btn:active { transform: scale(0.97); } .ff-btn.ff-btn-primary { background: var(--ff-accent); border-color: var(--ff-accent); color: #fff; } .ff-btn.ff-btn-primary:hover { background: var(--ff-accent-hover); } .ff-btn.ff-btn-danger { border-color: var(--ff-error); color: var(--ff-error); } .ff-btn.ff-btn-danger:hover { background: rgba(244,67,54,0.1); } .ff-btn-sm { padding: 4px 10px; font-size: 12px; } .ff-btn-lg { padding: 10px 20px; font-size: 14px; } .ff-input, .ff-select { padding: 8px 12px; border-radius: var(--ff-radius-sm); border: 1px solid var(--ff-border); background: var(--ff-bg-primary); color: var(--ff-text-primary); font-size: 13px; transition: border-color var(--ff-transition); outline: none; } .ff-input:focus, .ff-select:focus { border-color: var(--ff-accent); } .ff-input { width: 100%; box-sizing: border-box; } .ff-select { cursor: pointer; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-tooltip { position: relative; } .ff-tooltip::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #333; color: #e8e8e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 9999; } .ff-tooltip:hover::after { opacity: 1; } .ff-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--ff-accent); color: #fff; line-height: 1.4; } .ff-divider { height: 1px; background: var(--ff-border); margin: 12px 0; border: none; } .ff-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid var(--ff-border); background: var(--ff-bg-secondary); color: var(--ff-text-secondary); margin-left: 8px; } .ff-tag.ff-tag-green { border-color: var(--ff-success); color: var(--ff-success); background: rgba(76,175,80,0.1); } .ff-tag.ff-tag-red { border-color: var(--ff-error); color: var(--ff-error); background: rgba(244,67,54,0.1); } .ff-tag.ff-tag-yellow { border-color: var(--ff-warning); color: var(--ff-warning); background: rgba(255,152,0,0.1); } .ff-tag.ff-tag-purple { border-color: var(--ff-accent); color: var(--ff-accent); background: rgba(108,92,231,0.1); } .ff-scrollbar::-webkit-scrollbar { width: 6px; } .ff-scrollbar::-webkit-scrollbar-track { background: transparent; } .ff-scrollbar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; } .ff-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; } .ff-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--ff-border); border-top-color: var(--ff-accent); border-radius: 50%; animation: ff-spin 0.6s linear infinite; } @keyframes ff-spin { to { transform: rotate(360deg); } } .ff-skeleton { background: linear-gradient(90deg, var(--ff-bg-tertiary) 25%, var(--ff-bg-hover) 50%, var(--ff-bg-tertiary) 75%); background-size: 200% 100%; animation: ff-shimmer 1.5s infinite; border-radius: 4px; } @keyframes ff-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } } #ff-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: none; flex-direction: column; justify-content: center; align-items: center; gap: 16px; } .ff-modal-overlay-active { display: flex !important; } .ff-modal { background: var(--ff-bg-tertiary); border-radius: var(--ff-radius-lg); box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid var(--ff-border); color: var(--ff-text-primary); z-index: 9999999; } .ff-modal.ff-modal-pop { animation: ff-popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; } .ff-modal.ff-modal-closing { animation: ff-fadeIn 0.2s ease reverse forwards; } .ff-modal.ff-modal-confirm { padding: 32px; max-width: 440px; width: 90%; } .ff-modal.ff-modal-custom { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; } .ff-modal-confirm-icon { text-align: center; margin-bottom: 16px; } .ff-modal-confirm-title { margin: 0 0 8px; font-size: 20px; font-weight: 600; text-align: center; } .ff-modal-confirm-msg { margin: 0 0 24px; font-size: 14px; color: var(--ff-text-secondary); text-align: center; line-height: 1.5; } .ff-modal-confirm-actions { display: flex; gap: 10px; justify-content: center; } @keyframes ff-fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes ff-popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } } #fluxfind-settings-btn { position: fixed; bottom: 20px; right: 20px; z-index: 99999; border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(108,92,231,0.4); background: var(--ff-accent); border: none; } .ff-toggle-wrapper { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding: 6px 0; } .ff-toggle-input { display: none; } .ff-toggle-track { position: relative; width: 44px; height: 24px; border-radius: 12px; background: #555; flex-shrink: 0; transition: background 0.25s ease; } .ff-toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); } .ff-toggle-input:checked + .ff-toggle-track { background: var(--ff-accent); } .ff-toggle-input:checked + .ff-toggle-track .ff-toggle-knob { transform: translateX(20px); } .ff-toggle-label { font-size: 13px; font-weight: 500; color: var(--ff-text-primary); line-height: 1.3; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-settings-header { padding: 20px 28px; border-bottom: 1px solid var(--ff-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; } .ff-settings-header-title { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; } .ff-settings-body { display: flex; flex: 1; overflow: hidden; min-height: 0; } .ff-settings-sidebar { width: 180px; padding: 16px 12px; border-right: 1px solid var(--ff-border); flex-shrink: 0; overflow-y: auto; } .ff-settings-sidebar-btn { width: 100%; justify-content: flex-start; margin-bottom: 4px; border: none; background: transparent; } .ff-settings-sidebar-btn.ff-active { background: var(--ff-bg-hover); } .ff-settings-content { flex: 1; padding: 20px 28px; overflow-y: auto; } .ff-settings-home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; } .ff-settings-home-title { margin: 0; font-size: 22px; font-weight: 700; } .ff-settings-home-version { margin: 4px 0 0; font-size: 13px; color: var(--ff-text-muted); } .ff-settings-home-actions { display: flex; gap: 10px; margin-bottom: 20px; } .ff-settings-preset-title { font-size: 14px; font-weight: 600; margin: 16px 0 10px; } .ff-settings-preset-list { display: flex; flex-wrap: wrap; gap: 8px; } .ff-settings-section-title { font-size: 15px; font-weight: 600; margin: 0 0 14px; } .ff-settings-select-wrap { margin-bottom: 12px; } .ff-settings-select-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ff-text-secondary); } .ff-settings-about { text-align: center; padding: 20px 0; } .ff-settings-about-logo { margin-bottom: 16px; } .ff-settings-about-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; } .ff-settings-about-desc { margin: 0 0 16px; font-size: 13px; color: var(--ff-text-muted); line-height: 1.5; } .ff-settings-about-toggles { display: flex; gap: 16px; justify-content: center; } .ff-settings-about-footer { margin: 20px 0 0; font-size: 11px; color: var(--ff-text-muted); } .ff-server-controls { display: flex; gap: 8px; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; }';
+    const CSS = ':root { --ff-bg-primary: #1f1f1f; --ff-bg-secondary: #252525; --ff-bg-tertiary: #2a2a2a; --ff-bg-hover: #333333; --ff-border: #404040; --ff-border-light: #505050; --ff-text-primary: #e8e8e8; --ff-text-secondary: #b0b0b0; --ff-text-muted: #888888; --ff-accent: #6C5CE7; --ff-accent-hover: #7C6CF7; --ff-success: #4CAF50; --ff-error: #F44336; --ff-warning: #FF9800; --ff-radius-sm: 6px; --ff-radius-md: 8px; --ff-radius-lg: 12px; --ff-radius-xl: 20px; --ff-shadow: 0 4px 16px rgba(0,0,0,0.3); --ff-shadow-lg: 0 8px 32px rgba(0,0,0,0.4); --ff-transition: 0.15s ease; --ff-transition-slow: 0.25s ease; } .ff-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--ff-radius-sm); font: 500 13px -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; cursor: pointer; border: 1px solid var(--ff-border); background: var(--ff-bg-tertiary); color: var(--ff-text-primary); transition: background var(--ff-transition), border-color var(--ff-transition); outline: none; white-space: nowrap; line-height: 1.2; } .ff-btn:hover { background: var(--ff-bg-hover); border-color: var(--ff-border-light); } .ff-btn:active { transform: scale(0.97); } .ff-btn.ff-btn-primary { background: var(--ff-accent); border-color: var(--ff-accent); color: #fff; } .ff-btn.ff-btn-primary:hover { background: var(--ff-accent-hover); } .ff-btn.ff-btn-danger { border-color: var(--ff-error); color: var(--ff-error); } .ff-btn.ff-btn-danger:hover { background: rgba(244,67,54,0.1); } .ff-btn-sm { padding: 4px 10px; font-size: 12px; } .ff-btn-lg { padding: 10px 20px; font-size: 14px; } .ff-input, .ff-select { padding: 8px 12px; border-radius: var(--ff-radius-sm); border: 1px solid var(--ff-border); background: var(--ff-bg-primary); color: var(--ff-text-primary); font-size: 13px; transition: border-color var(--ff-transition); outline: none; } .ff-input:focus, .ff-select:focus { border-color: var(--ff-accent); } .ff-input { width: 100%; box-sizing: border-box; } .ff-select { cursor: pointer; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-tooltip { position: relative; } .ff-tooltip::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #333; color: #e8e8e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 9999; } .ff-tooltip:hover::after { opacity: 1; } .ff-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--ff-accent); color: #fff; line-height: 1.4; } .ff-divider { height: 1px; background: var(--ff-border); margin: 12px 0; border: none; } .ff-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid var(--ff-border); background: var(--ff-bg-secondary); color: var(--ff-text-secondary); margin-left: 8px; } .ff-tag.ff-tag-green { border-color: var(--ff-success); color: var(--ff-success); background: rgba(76,175,80,0.1); } .ff-tag.ff-tag-red { border-color: var(--ff-error); color: var(--ff-error); background: rgba(244,67,54,0.1); } .ff-tag.ff-tag-yellow { border-color: var(--ff-warning); color: var(--ff-warning); background: rgba(255,152,0,0.1); } .ff-tag.ff-tag-purple { border-color: var(--ff-accent); color: var(--ff-accent); background: rgba(108,92,231,0.1); } .ff-scrollbar::-webkit-scrollbar { width: 6px; } .ff-scrollbar::-webkit-scrollbar-track { background: transparent; } .ff-scrollbar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; } .ff-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; } .ff-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--ff-border); border-top-color: var(--ff-accent); border-radius: 50%; animation: ff-spin 0.6s linear infinite; } @keyframes ff-spin { to { transform: rotate(360deg); } } .ff-skeleton { background: linear-gradient(90deg, var(--ff-bg-tertiary) 25%, var(--ff-bg-hover) 50%, var(--ff-bg-tertiary) 75%); background-size: 200% 100%; animation: ff-shimmer 1.5s infinite; border-radius: 4px; } @keyframes ff-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } } #ff-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: none; flex-direction: column; justify-content: center; align-items: center; gap: 16px; } .ff-modal-overlay-active { display: flex !important; } .ff-modal { background: var(--ff-bg-tertiary); border-radius: var(--ff-radius-lg); box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid var(--ff-border); color: var(--ff-text-primary); z-index: 9999999; } .ff-modal.ff-modal-pop { animation: ff-popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; } .ff-modal.ff-modal-closing { animation: ff-fadeIn 0.2s ease reverse forwards; } .ff-modal.ff-modal-confirm { padding: 32px; max-width: 440px; width: 90%; } .ff-modal.ff-modal-custom { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; } .ff-modal-confirm-icon { text-align: center; margin-bottom: 16px; } .ff-modal-confirm-title { margin: 0 0 8px; font-size: 20px; font-weight: 600; text-align: center; } .ff-modal-confirm-msg { margin: 0 0 24px; font-size: 14px; color: var(--ff-text-secondary); text-align: center; line-height: 1.5; } .ff-modal-confirm-actions { display: flex; gap: 10px; justify-content: center; } @keyframes ff-fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes ff-popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } } #fluxfind-settings-btn { position: fixed; bottom: 20px; right: 20px; z-index: 99999; border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(108,92,231,0.4); background: var(--ff-accent); border: none; } .ff-toggle-wrapper { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding: 6px 0; } .ff-toggle-input { display: none; } .ff-toggle-track { position: relative; width: 44px; height: 24px; border-radius: 12px; background: #555; flex-shrink: 0; transition: background 0.25s ease; } .ff-toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); } .ff-toggle-input:checked + .ff-toggle-track { background: var(--ff-accent); } .ff-toggle-input:checked + .ff-toggle-track .ff-toggle-knob { transform: translateX(20px); } .ff-toggle-label { font-size: 13px; font-weight: 500; color: var(--ff-text-primary); line-height: 1.3; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-settings-header { padding: 20px 28px; border-bottom: 1px solid var(--ff-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; } .ff-settings-header-title { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; } .ff-settings-body { display: flex; flex: 1; overflow: hidden; min-height: 0; } .ff-settings-sidebar { width: 180px; padding: 16px 12px; border-right: 1px solid var(--ff-border); flex-shrink: 0; overflow-y: auto; } .ff-settings-sidebar-btn { width: 100%; justify-content: flex-start; margin-bottom: 4px; border: none; background: transparent; padding: 16px; } .ff-settings-sidebar-btn.ff-active { background: var(--ff-bg-hover); } .ff-settings-content { flex: 1; padding: 20px 28px; overflow-y: auto; } .ff-settings-home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; } .ff-settings-home-title { margin: 0; font-size: 22px; font-weight: 700; } .ff-settings-home-version { margin: 4px 0 0; font-size: 13px; color: var(--ff-text-muted); } .ff-settings-home-actions { display: flex; gap: 10px; margin-bottom: 20px; } .ff-settings-preset-title { font-size: 14px; font-weight: 600; margin: 16px 0 10px; } .ff-settings-preset-list { display: flex; flex-wrap: wrap; gap: 8px; } .ff-settings-section-title { font-size: 15px; font-weight: 600; margin: 0 0 14px; } .ff-settings-select-wrap { margin-bottom: 12px; } .ff-settings-select-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ff-text-secondary); } .ff-settings-about { text-align: center; padding: 20px 0; } .ff-settings-about-logo { margin-bottom: 16px; } .ff-settings-about-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; } .ff-settings-about-desc { margin: 0 0 16px; font-size: 13px; color: var(--ff-text-muted); line-height: 1.5; } .ff-settings-about-toggles { display: flex; gap: 16px; justify-content: center; } .ff-settings-about-footer { margin: 20px 0 0; font-size: 11px; color: var(--ff-text-muted); } .ff-server-controls { display: flex; gap: 8px; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; }';
 
     function injectAll() {
         if (CSS && CSS.length > 0 && CSS !== '/* CSS is embedded at build time from src/ui/css/*.css files */') {
@@ -3185,7 +3177,7 @@ const FluxFeatureEnhancements = (() => {
             });
         });
         _termsObserver.observe(document.body, { childList: true, subtree: true });
-        FluxLogger.info('Classic terms restoration active (TreeWalker + MutationObserver)');
+        FluxLogger.info('Classic terms restoration active');
     }
 
     let _termsObserver = null;
@@ -3218,27 +3210,27 @@ const FluxFeatureEnhancements = (() => {
         if (activeFeatures.has('friends')) return;
         activeFeatures.add('friends');
         enhanceFriendCards();
-        const carousel = document.querySelector('.friends-carousel-list-container, .friend-carousel-container');
-        if (carousel) {
-            friendsObserver = new MutationObserver(FluxUtils.debounce(enhanceFriendCards, 300));
-            friendsObserver.observe(carousel, { childList: true, subtree: true });
-            FluxLogger.info('Better friends: observing friend carousel');
-        } else {
-            FluxLogger.info('Better friends: friend carousel not found on this page');
-        }
+        // Watch the whole body for React re-renders
+        friendsObserver = new MutationObserver(FluxUtils.debounce(enhanceFriendCards, 500));
+        friendsObserver.observe(document.body, { childList: true, subtree: true });
+        FluxLogger.info('Better friends: observing for friend tiles');
     }
     function stopFriends() {
         activeFeatures.delete('friends');
         if (friendsObserver) { friendsObserver.disconnect(); friendsObserver = null; }
     }
     function enhanceFriendCards() {
-        const tiles = document.querySelectorAll('.friends-carousel-tile, [data-testid="friend-tile"]');
+        // Match Roblox's actual class: .friends-carousel-tile
+        const tiles = document.querySelectorAll('.friends-carousel-tile');
         let enhanced = 0;
         tiles.forEach(tile => {
+            // Skip the "Add Friends" tile (it has no avatar-status)
             if (tile.dataset.ffFriends) return;
             tile.dataset.ffFriends = '1';
-            const gameEl = tile.querySelector('.icon-game, .game');
-            if (gameEl || tile.querySelector('[data-testid="presence-icon"]')) {
+            const gameIcon = tile.querySelector('.icon-game, [data-testid="presence-icon"]');
+            const hasGame = tile.querySelector('.avatar-status .game, .icon-game') ||
+                            tile.querySelector('[data-testid="presence-icon"].game');
+            if (hasGame || gameIcon) {
                 tile.style.boxShadow = '0 0 12px rgba(108,92,231,0.3)';
                 tile.style.borderRadius = '8px';
                 tile.style.transition = 'box-shadow 0.3s ease';
@@ -3248,50 +3240,47 @@ const FluxFeatureEnhancements = (() => {
         if (enhanced > 0) FluxLogger.info(`Better friends: ${enhanced} online friends highlighted`);
     }
 
-    /* ========== 6. Better Profile Info ========== */
+    /* ========== 6. Better Profile Info (replaces Roblox buttons) ========== */
     let profileObserver = null;
     async function enableBetterProfile() {
         if (!FluxStorage.getBool('betterprofileinfo')) { stopProfile(); return; }
         if (activeFeatures.has('profile')) return;
         activeFeatures.add('profile');
-        await injectProfileStats();
-        const profileContainer = document.querySelector('.profile-header, [data-testid="profile-header"]');
-        if (profileContainer) {
-            profileObserver = new MutationObserver(FluxUtils.debounce(() => injectProfileStats(), 500));
-            profileObserver.observe(profileContainer, { childList: true, subtree: true });
-        }
+        await replaceProfileStats();
+        profileObserver = new MutationObserver(FluxUtils.debounce(() => replaceProfileStats(), 800));
+        profileObserver.observe(document.body, { childList: true, subtree: true });
     }
     function stopProfile() {
         activeFeatures.delete('profile');
         if (profileObserver) { profileObserver.disconnect(); profileObserver = null; }
-        const panel = document.getElementById('ff-profile-stats');
-        if (panel) panel.remove();
     }
-    async function injectProfileStats() {
-        if (document.getElementById('ff-profile-stats')) return;
+    async function replaceProfileStats() {
         const profileMatch = window.location.pathname.match(/\/users\/(\d+)/);
         const targetId = profileMatch ? parseInt(profileMatch[1]) : null;
-        if (!targetId) { FluxLogger.info('Better profile: no profile ID in URL'); return; }
+        if (!targetId) return;
 
         try {
             const stats = await FluxUsersAPI.getUserStats(targetId, 'smartsearch');
-            if (!stats) { FluxLogger.info('Better profile: no stats returned for user ' + targetId); return; }
+            if (!stats) return;
 
-            const container = document.querySelector('.profile-header-top, .profile-header, .profile-about, [class*="profile-header"]');
-            if (!container) { FluxLogger.info('Better profile: profile header container not found'); return; }
-
-            const panel = FluxDOM.el('div', {
-                id: 'ff-profile-stats',
-                className: 'ff-profile-stats-panel',
-                style: 'display:flex;gap:16px;margin-top:12px;padding:12px 16px;background:var(--ff-bg-secondary);border-radius:var(--ff-radius-md);border:1px solid var(--ff-border);font-size:13px;color:var(--ff-text-secondary)'
-            });
-            panel.innerHTML = `
-                <span>${FluxIcons.get('users', { size: 14 })} ${(stats.friendCount || 0).toLocaleString()} Friends</span>
-                <span>${FluxIcons.get('heart', { size: 14 })} ${(stats.followerCount || 0).toLocaleString()} Followers</span>
-            `;
-            container.appendChild(panel);
-            FluxLogger.info(`Better profile: stats injected for user ${targetId}`);
-        } catch (e) { FluxLogger.info('Better profile: API call failed', e); }
+            // Find Roblox's existing friend/follower button row
+            const friendLinks = document.querySelectorAll('.flex-nowrap.gap-small a[href*="/friends"]');
+            if (friendLinks.length >= 2) {
+                const friendSpan = friendLinks[0].querySelector('span');
+                if (friendSpan && !friendSpan.dataset.ffProfileReplaced) {
+                    friendSpan.dataset.ffProfileReplaced = '1';
+                    friendSpan.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px">${FluxIcons.get('users', { size: 14 })} ${(stats.friendCount || 0).toLocaleString()} Friends</span>`;
+                }
+                if (friendLinks[1]) {
+                    const followerSpan = friendLinks[1].querySelector('span');
+                    if (followerSpan && !followerSpan.dataset.ffProfileReplaced) {
+                        followerSpan.dataset.ffProfileReplaced = '1';
+                        followerSpan.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px">${FluxIcons.get('heart', { size: 14 })} ${(stats.followerCount || 0).toLocaleString()} Followers</span>`;
+                    }
+                }
+                FluxLogger.info(`Better profile: stats replaced for user ${targetId}`);
+            }
+        } catch (e) { FluxLogger.info('Better profile: API failed', e); }
     }
 
     /* ========== 7. Smart Search ========== */
@@ -3372,7 +3361,7 @@ const FluxFeatureEnhancements = (() => {
             const favGames = await FluxGamesAPI.getFavoriteGames(userId);
             if (!favGames || favGames.length < 3) { FluxLogger.info('Quick launch: not enough favorite games'); return; }
 
-            const panel = FluxDOM.el('div', { id: 'ff-quick-launch', className: 'ff-quick-launch-panel' });
+            const panel = FluxDOM.el('div', { id: 'ff-quick-launch' });
             panel.innerHTML = `<h3 style="margin:0 0 12px;font-size:14px;font-weight:600;color:var(--ff-text-primary)">${FluxIcons.get('zap', { size: 14 })} Quick Launch</h3>`;
             const btnContainer = FluxDOM.el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' });
 
@@ -3413,10 +3402,10 @@ const FluxFeatureEnhancements = (() => {
         try {
             const universeId = await FluxGamesAPI.getUniverseId(gameId);
             const votes = await FluxGamesAPI.getGameVotes(universeId);
-            if (!votes) { FluxLogger.info('Game stats: no vote data for universe ' + universeId); return; }
+            if (!votes) return;
 
             const statContainer = document.querySelector('.game-stat, .game-stats-container, [class*="game-stats"], .game-details-info');
-            if (!statContainer) { FluxLogger.info('Game stats: stat container not found'); return; }
+            if (!statContainer) return;
 
             const badge = FluxDOM.el('div', {
                 id: 'ff-vote-badge',
@@ -3432,7 +3421,6 @@ const FluxFeatureEnhancements = (() => {
 
     /* ========== Init ========== */
 
-    /** Called by FluxApp.activateFeature('enhancements', ...) */
     function init() {
         FluxLogger.info('Enhancements module: applying all settings');
 
@@ -3443,7 +3431,6 @@ const FluxFeatureEnhancements = (() => {
         enableBetterFriends();
         enableSmartSearch();
 
-        // API-dependent features (deferred to allow page DOM to load)
         setTimeout(() => {
             enableBetterProfile();
             enableQuickLaunch();
@@ -3452,27 +3439,11 @@ const FluxFeatureEnhancements = (() => {
     }
 
     function applySingleSetting(key, value) {
-        const handlers = {
-            disablechat: enableDisableChat,
-            smallerrobloxsidebar: enableSmallerSidebar,
-            responsivegamecards: enableResponsiveCards,
-            restoreclassicterms: enableClassicTerms,
-            betterfriends: enableBetterFriends,
-            betterprofileinfo: enableBetterProfile,
-            smartsearch: enableSmartSearch,
-            quicklaunchgames: enableQuickLaunch,
-            bettergamestats: enableBetterGameStats,
-        };
-
-        FluxLogger.info(`Enhancements: applying setting ${key}=${value}`);
-        if (handlers[key]) {
-            handlers[key]();
-        }
+        FluxLogger.info(`Enhancements: ${key}=${value}`);
     }
 
     return {
-        init,  // MUST be named 'init' for FluxApp.activateFeature()
-        applySingleSetting,
+        init, applySingleSetting,
         enableDisableChat, stopChat,
         enableSmallerSidebar, stopSidebar,
         enableResponsiveCards, stopCards,
@@ -3688,4 +3659,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 21, JS lines: 3593
+// Total modules: 21, JS lines: 3564
