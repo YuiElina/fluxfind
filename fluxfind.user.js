@@ -2900,8 +2900,9 @@ const FluxFeatureServerBrowser = (() => {
         quickJoinBtn.innerHTML = `${FluxIcons.get('zap', { size: 14 })} Quick Join`;
 
         FluxUtils.batchAppend(btnContainer, [refreshBtn, filterBtn, regionSelect, quickJoinBtn]);
-        // Append controls inside the server-list-options container
-        serverContainer.appendChild(btnContainer);
+        // Insert controls as a sibling before Roblox's server list options
+        const parent = serverContainer.parentNode;
+        parent.insertBefore(btnContainer, serverContainer);
         filterButtonAdded = true;
 
         // Auto-apply saved region filter
@@ -3102,7 +3103,8 @@ const FluxFeatureServerBrowser = (() => {
 /**
  * FluxFind Enhancements Module
  * Implements all settings toggles: chat, friends, profile, search, sidebar, cards, terms, stats
- * Each feature has start/stop for live toggle without page reload
+ * Each feature has start/stop for live toggle without page reload.
+ * Exported as 'init' so FluxApp.activateFeature() can call it.
  *
  * @module features/enhancements
  * @license GPL-2.0-only
@@ -3115,42 +3117,42 @@ const FluxFeatureEnhancements = (() => {
 
     /* ========== 1. Disable Chat Bar ========== */
     let chatStyleEl = null;
-    const CHAT_CSS = '#chat-header, #chat-container, .chat-windows-header, .chat-main-window, [class*="chat-window"] { display: none !important; }';
+    const CHAT_CSS = `#chat-header, #chat-container, .chat-windows-header, .chat-main-window,
+        [class*="chat-window"], div[class*="chat"], .chat-header, .chat-friends,
+        #chat-friends, .chat-avatar, [id*="chat"], [class*="Chat"] { display: none !important; }`;
 
     function enableDisableChat() {
-        if (!FluxStorage.getBool('disablechat')) { stopChat();
-            return; }
+        if (!FluxStorage.getBool('disablechat')) { stopChat(); return; }
         if (activeFeatures.has('chat')) return;
         chatStyleEl = FluxDOM.injectStyleOnce('ff-disable-chat', CHAT_CSS);
         activeFeatures.add('chat');
+        FluxLogger.info('Chat bar disabled (CSS injected)');
     }
     function stopChat() {
-        if (chatStyleEl) { chatStyleEl.remove();
-            chatStyleEl = null; }
+        if (chatStyleEl) { chatStyleEl.remove(); chatStyleEl = null; }
         activeFeatures.delete('chat');
     }
 
     /* ========== 2. Smaller Roblox Sidebar ========== */
     let sidebarStyleEl = null;
     const SIDEBAR_CSS = `
-        .rbx-left-col, .left-col, [class*="left-col"], .nav-column, #navigation {
+        .rbx-left-col, .left-col, [class*="left-col"], .nav-column, #navigation, nav[class*="nav"] {
             width: 180px !important; min-width: 180px !important; flex: 0 0 180px !important;
         }
-        .rbx-content, .content, [class*="content-col"] {
+        .rbx-content, .content, [class*="content-col"], main[class*="content"] {
             margin-left: 180px !important;
         }
     `;
 
     function enableSmallerSidebar() {
-        if (!FluxStorage.getBool('smallerrobloxsidebar')) { stopSidebar();
-            return; }
+        if (!FluxStorage.getBool('smallerrobloxsidebar')) { stopSidebar(); return; }
         if (activeFeatures.has('sidebar')) return;
         sidebarStyleEl = FluxDOM.injectStyleOnce('ff-smaller-sidebar', SIDEBAR_CSS);
         activeFeatures.add('sidebar');
+        FluxLogger.info('Smaller sidebar applied (CSS injected)');
     }
     function stopSidebar() {
-        if (sidebarStyleEl) { sidebarStyleEl.remove();
-            sidebarStyleEl = null; }
+        if (sidebarStyleEl) { sidebarStyleEl.remove(); sidebarStyleEl = null; }
         activeFeatures.delete('sidebar');
     }
 
@@ -3166,15 +3168,14 @@ const FluxFeatureEnhancements = (() => {
     `;
 
     function enableResponsiveCards() {
-        if (FluxStorage.getBool('responsivegamecards', true) === false) { stopCards();
-            return; }
+        if (FluxStorage.getBool('responsivegamecards', true) === false) { stopCards(); return; }
         if (activeFeatures.has('cards')) return;
         cardsStyleEl = FluxDOM.injectStyleOnce('ff-responsive-cards', CARDS_CSS);
         activeFeatures.add('cards');
+        FluxLogger.info('Responsive game cards applied (CSS injected)');
     }
     function stopCards() {
-        if (cardsStyleEl) { cardsStyleEl.remove();
-            cardsStyleEl = null; }
+        if (cardsStyleEl) { cardsStyleEl.remove(); cardsStyleEl = null; }
         activeFeatures.delete('cards');
     }
 
@@ -3188,8 +3189,7 @@ const FluxFeatureEnhancements = (() => {
     ];
 
     function enableClassicTerms() {
-        if (!FluxStorage.getBool('restoreclassicterms')) { stopTerms();
-            return; }
+        if (!FluxStorage.getBool('restoreclassicterms')) { stopTerms(); return; }
         if (activeFeatures.has('terms')) return;
         activeFeatures.add('terms');
         walkAndReplace(document.body);
@@ -3201,18 +3201,18 @@ const FluxFeatureEnhancements = (() => {
             });
         });
         _termsObserver.observe(document.body, { childList: true, subtree: true });
+        FluxLogger.info('Classic terms restoration active (TreeWalker + MutationObserver)');
     }
 
     let _termsObserver = null;
     function stopTerms() {
         activeFeatures.delete('terms');
-        if (_termsObserver) { _termsObserver.disconnect();
-            _termsObserver = null; }
+        if (_termsObserver) { _termsObserver.disconnect(); _termsObserver = null; }
     }
 
     function walkAndReplace(root) {
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-        let node;
+        let node, count = 0;
         while ((node = walker.nextNode())) {
             let changed = false;
             let text = node.textContent;
@@ -3222,55 +3222,55 @@ const FluxFeatureEnhancements = (() => {
                     changed = true;
                 }
             }
-            if (changed) node.textContent = text;
+            if (changed) { node.textContent = text; count++; }
         }
+        if (count > 0) FluxLogger.info(`Classic terms: replaced ${count} text nodes`);
     }
 
     /* ========== 5. Better Friends Page ========== */
     let friendsObserver = null;
     function enableBetterFriends() {
-        if (!FluxStorage.getBool('betterfriends')) { stopFriends();
-            return; }
+        if (!FluxStorage.getBool('betterfriends')) { stopFriends(); return; }
         if (activeFeatures.has('friends')) return;
         activeFeatures.add('friends');
         enhanceFriendCards();
-        // Observe for carousel changes
         const carousel = document.querySelector('.friends-carousel-list-container, .friend-carousel-container');
         if (carousel) {
             friendsObserver = new MutationObserver(FluxUtils.debounce(enhanceFriendCards, 300));
             friendsObserver.observe(carousel, { childList: true, subtree: true });
+            FluxLogger.info('Better friends: observing friend carousel');
+        } else {
+            FluxLogger.info('Better friends: friend carousel not found on this page');
         }
     }
     function stopFriends() {
         activeFeatures.delete('friends');
-        if (friendsObserver) { friendsObserver.disconnect();
-            friendsObserver = null; }
+        if (friendsObserver) { friendsObserver.disconnect(); friendsObserver = null; }
     }
     function enhanceFriendCards() {
         const tiles = document.querySelectorAll('.friends-carousel-tile, [data-testid="friend-tile"]');
+        let enhanced = 0;
         tiles.forEach(tile => {
             if (tile.dataset.ffFriends) return;
             tile.dataset.ffFriends = '1';
-            // Highlight online friends with a subtle purple glow
-            const statusEl = tile.querySelector('.avatar-status, [data-testid="presence-icon"]');
-            const gameEl = tile.querySelector('.icon-game');
-            if (gameEl || (statusEl && statusEl.classList.contains('game'))) {
+            const gameEl = tile.querySelector('.icon-game, .game');
+            if (gameEl || tile.querySelector('[data-testid="presence-icon"]')) {
                 tile.style.boxShadow = '0 0 12px rgba(108,92,231,0.3)';
                 tile.style.borderRadius = '8px';
                 tile.style.transition = 'box-shadow 0.3s ease';
+                enhanced++;
             }
         });
+        if (enhanced > 0) FluxLogger.info(`Better friends: ${enhanced} online friends highlighted`);
     }
 
     /* ========== 6. Better Profile Info ========== */
     let profileObserver = null;
     async function enableBetterProfile() {
-        if (!FluxStorage.getBool('betterprofileinfo')) { stopProfile();
-            return; }
+        if (!FluxStorage.getBool('betterprofileinfo')) { stopProfile(); return; }
         if (activeFeatures.has('profile')) return;
         activeFeatures.add('profile');
         await injectProfileStats();
-        // Observe for profile page changes
         const profileContainer = document.querySelector('.profile-header, [data-testid="profile-header"]');
         if (profileContainer) {
             profileObserver = new MutationObserver(FluxUtils.debounce(() => injectProfileStats(), 500));
@@ -3279,47 +3279,41 @@ const FluxFeatureEnhancements = (() => {
     }
     function stopProfile() {
         activeFeatures.delete('profile');
-        if (profileObserver) { profileObserver.disconnect();
-            profileObserver = null; }
+        if (profileObserver) { profileObserver.disconnect(); profileObserver = null; }
         const panel = document.getElementById('ff-profile-stats');
         if (panel) panel.remove();
     }
     async function injectProfileStats() {
         if (document.getElementById('ff-profile-stats')) return;
-        const userId = FluxUsersAPI.getCurrentUserId();
-        const profileId = window.location.pathname.match(/\/users\/(\d+)/);
-        const targetId = profileId ? parseInt(profileId[1]) : userId;
-        if (!targetId) return;
+        const profileMatch = window.location.pathname.match(/\/users\/(\d+)/);
+        const targetId = profileMatch ? parseInt(profileMatch[1]) : null;
+        if (!targetId) { FluxLogger.info('Better profile: no profile ID in URL'); return; }
 
         try {
             const stats = await FluxUsersAPI.getUserStats(targetId, 'smartsearch');
-            if (!stats) return;
+            if (!stats) { FluxLogger.info('Better profile: no stats returned for user ' + targetId); return; }
 
             const container = document.querySelector('.profile-header-top, .profile-header, .profile-about, [class*="profile-header"]');
-            if (!container) return;
+            if (!container) { FluxLogger.info('Better profile: profile header container not found'); return; }
 
             const panel = FluxDOM.el('div', {
                 id: 'ff-profile-stats',
-                style: {
-                    display: 'flex', gap: '16px', marginTop: '12px', padding: '12px 16px',
-                    background: 'var(--ff-bg-secondary)', borderRadius: 'var(--ff-radius-md)',
-                    border: '1px solid var(--ff-border)', fontSize: '13px',
-                    color: 'var(--ff-text-secondary)'
-                }
+                className: 'ff-profile-stats-panel',
+                style: 'display:flex;gap:16px;margin-top:12px;padding:12px 16px;background:var(--ff-bg-secondary);border-radius:var(--ff-radius-md);border:1px solid var(--ff-border);font-size:13px;color:var(--ff-text-secondary)'
             });
             panel.innerHTML = `
                 <span>${FluxIcons.get('users', { size: 14 })} ${(stats.friendCount || 0).toLocaleString()} Friends</span>
                 <span>${FluxIcons.get('heart', { size: 14 })} ${(stats.followerCount || 0).toLocaleString()} Followers</span>
             `;
             container.appendChild(panel);
-        } catch { /* profile page may not exist */ }
+            FluxLogger.info(`Better profile: stats injected for user ${targetId}`);
+        } catch (e) { FluxLogger.info('Better profile: API call failed', e); }
     }
 
     /* ========== 7. Smart Search ========== */
     let searchObserver = null;
     function enableSmartSearch() {
-        if (!FluxStorage.getBool('smartsearch', true)) { stopSearch();
-            return; }
+        if (!FluxStorage.getBool('smartsearch', true)) { stopSearch(); return; }
         if (activeFeatures.has('search')) return;
         activeFeatures.add('search');
         enhanceSearchDropdown();
@@ -3327,47 +3321,52 @@ const FluxFeatureEnhancements = (() => {
         if (searchContainer) {
             searchObserver = new MutationObserver(FluxUtils.debounce(enhanceSearchDropdown, 300));
             searchObserver.observe(searchContainer, { childList: true, subtree: true });
+            FluxLogger.info('Smart search: observing search dropdown');
+        } else {
+            FluxLogger.info('Smart search: search container not found on this page');
         }
     }
     function stopSearch() {
         activeFeatures.delete('search');
-        if (searchObserver) { searchObserver.disconnect();
-            searchObserver = null; }
+        if (searchObserver) { searchObserver.disconnect(); searchObserver = null; }
     }
     function enhanceSearchDropdown() {
         const options = document.querySelectorAll('.navbar-search-option, .new-navbar-search-anchor');
         const iconMap = {
-            'Games': 'gamepad', 'People': 'users', 'Marketplace': 'shop', 'Catalog': 'shop',
-            'Communities': 'users', 'Creator Store': 'pallete', 'in Games': 'gamepad',
-            'in People': 'user', 'in Marketplace': 'copy', 'in Communities': 'users',
-            'in Creator Store': 'download'
+            'Games': 'gamepad', 'in Games': 'gamepad',
+            'People': 'user', 'in People': 'user',
+            'Marketplace': 'copy', 'in Marketplace': 'copy',
+            'Catalog': 'copy', 'in Catalog': 'copy',
+            'Communities': 'users', 'in Communities': 'users',
+            'Creator Store': 'download', 'in Creator Store': 'download'
         };
 
+        let replaced = 0;
         options.forEach(link => {
             if (link.dataset.ffSearchEnhanced) return;
             link.dataset.ffSearchEnhanced = '1';
             const text = link.textContent.trim();
             const existingIcon = link.querySelector('.icon-menu-');
             if (existingIcon && existingIcon.parentNode) {
-                // Replace Roblox icon span with our SVG
                 const iconSpan = existingIcon.parentNode;
                 if (!iconSpan.dataset.ffReplaced) {
                     iconSpan.dataset.ffReplaced = '1';
                     for (const [keyword, icon] of Object.entries(iconMap)) {
                         if (text.includes(keyword)) {
-                            iconSpan.innerHTML = `<span style="display:inline-flex;vertical-align:middle;margin-right:4px;">${FluxIcons.get(icon, { size: 14, color: 'var(--ff-text-muted)' })}</span>`;
+                            iconSpan.innerHTML = `<span style="display:inline-flex;vertical-align:middle;margin-right:4px">${FluxIcons.get(icon, { size: 14, color: 'var(--ff-text-muted)' })}</span>`;
+                            replaced++;
                             break;
                         }
                     }
                 }
             }
         });
+        if (replaced > 0) FluxLogger.info(`Smart search: ${replaced} icons replaced`);
     }
 
     /* ========== 8. Quick Launch Games ========== */
     function enableQuickLaunch() {
-        if (!FluxStorage.getBool('quicklaunchgames', true)) { stopQuickLaunch();
-            return; }
+        if (!FluxStorage.getBool('quicklaunchgames', true)) { stopQuickLaunch(); return; }
         if (activeFeatures.has('quicklaunch')) return;
         activeFeatures.add('quicklaunch');
         injectQuickLaunch();
@@ -3380,25 +3379,18 @@ const FluxFeatureEnhancements = (() => {
     async function injectQuickLaunch() {
         if (document.getElementById('ff-quick-launch')) return;
         const homeGrid = document.querySelector('.home-page-game-grid, [data-testid="home-page-game-grid"]');
-        if (!homeGrid) return;
+        if (!homeGrid) { FluxLogger.info('Quick launch: home grid not found'); return; }
 
         const userId = FluxUsersAPI.getCurrentUserId();
-        if (!userId) return;
+        if (!userId) { FluxLogger.info('Quick launch: no user ID'); return; }
 
         try {
             const favGames = await FluxGamesAPI.getFavoriteGames(userId);
-            if (!favGames || favGames.length < 3) return;
+            if (!favGames || favGames.length < 3) { FluxLogger.info('Quick launch: not enough favorite games'); return; }
 
-            const panel = FluxDOM.el('div', {
-                id: 'ff-quick-launch',
-                style: {
-                    padding: '16px', marginBottom: '16px',
-                    background: 'var(--ff-bg-secondary)', borderRadius: 'var(--ff-radius-md)',
-                    border: '1px solid var(--ff-border)'
-                }
-            });
-            panel.innerHTML = `<h3 style="margin:0 0 12px;font-size:14px;font-weight:600;color:var(--ff-text-primary);">${FluxIcons.get('zap', { size: 14 })} Quick Launch</h3>`;
-            const btnContainer = FluxDOM.el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+            const panel = FluxDOM.el('div', { id: 'ff-quick-launch', className: 'ff-quick-launch-panel' });
+            panel.innerHTML = `<h3 style="margin:0 0 12px;font-size:14px;font-weight:600;color:var(--ff-text-primary)">${FluxIcons.get('zap', { size: 14 })} Quick Launch</h3>`;
+            const btnContainer = FluxDOM.el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' });
 
             favGames.slice(0, 6).forEach(game => {
                 const btn = FluxDOM.el('button', {
@@ -3411,13 +3403,13 @@ const FluxFeatureEnhancements = (() => {
 
             panel.appendChild(btnContainer);
             homeGrid.parentNode.insertBefore(panel, homeGrid);
-        } catch { /* ignore */ }
+            FluxLogger.info(`Quick launch: ${favGames.slice(0, 6).length} games added`);
+        } catch (e) { FluxLogger.info('Quick launch: failed', e); }
     }
 
     /* ========== 9. Better Game Stats ========== */
     function enableBetterGameStats() {
-        if (!FluxStorage.getBool('bettergamestats', true)) { stopGameStats();
-            return; }
+        if (!FluxStorage.getBool('bettergamestats', true)) { stopGameStats(); return; }
         if (activeFeatures.has('gamestats')) return;
         activeFeatures.add('gamestats');
         injectGameVotes();
@@ -3429,42 +3421,47 @@ const FluxFeatureEnhancements = (() => {
     }
     async function injectGameVotes() {
         if (document.getElementById('ff-vote-badge')) return;
-        const gameId = FluxGamesAPI.getCurrentGameId();
+        const gameMatch = window.location.pathname.match(/\/games\/(\d+)/);
+        if (!gameMatch) { FluxLogger.info('Game stats: not on a game page'); return; }
+        const gameId = parseInt(gameMatch[1]);
         if (!gameId) return;
 
         try {
             const universeId = await FluxGamesAPI.getUniverseId(gameId);
             const votes = await FluxGamesAPI.getGameVotes(universeId);
-            if (!votes) return;
+            if (!votes) { FluxLogger.info('Game stats: no vote data for universe ' + universeId); return; }
 
             const statContainer = document.querySelector('.game-stat, .game-stats-container, [class*="game-stats"], .game-details-info');
-            if (!statContainer) return;
+            if (!statContainer) { FluxLogger.info('Game stats: stat container not found'); return; }
 
             const badge = FluxDOM.el('div', {
                 id: 'ff-vote-badge',
                 className: 'ff-badge',
-                style: { marginLeft: '8px', display: 'inline-flex' }
+                style: 'margin-left:8px;display:inline-flex'
             });
             const ratio = votes.downVotes > 0 ? (votes.upVotes / (votes.upVotes + votes.downVotes) * 100).toFixed(0) : 100;
             badge.innerHTML = `${FluxIcons.get('star', { size: 12 })} ${ratio}% (${(votes.upVotes || 0).toLocaleString()} likes)`;
             statContainer.appendChild(badge);
-        } catch { /* ignore */ }
+            FluxLogger.info(`Game stats: ${ratio}% ratio badge added`);
+        } catch (e) { FluxLogger.info('Game stats: failed', e); }
     }
 
-    /* ========== Init All ========== */
-    function initAll() {
-        FluxLogger.debug('Enhancements module: applying all settings');
+    /* ========== Init ========== */
+
+    /** Called by FluxApp.activateFeature('enhancements', ...) */
+    function init() {
+        FluxLogger.info('Enhancements module: applying all settings');
 
         enableDisableChat();
         enableSmallerSidebar();
         enableResponsiveCards();
         enableClassicTerms();
+        enableBetterFriends();
+        enableSmartSearch();
 
-        // Page-specific features (deferred until DOM ready for those pages)
+        // API-dependent features (deferred to allow page DOM to load)
         setTimeout(() => {
-            enableBetterFriends();
             enableBetterProfile();
-            enableSmartSearch();
             enableQuickLaunch();
             enableBetterGameStats();
         }, 1000);
@@ -3483,15 +3480,15 @@ const FluxFeatureEnhancements = (() => {
             bettergamestats: enableBetterGameStats,
         };
 
+        FluxLogger.info(`Enhancements: applying setting ${key}=${value}`);
         if (handlers[key]) {
             handlers[key]();
         }
     }
 
     return {
-        initAll,
+        init,  // MUST be named 'init' for FluxApp.activateFeature()
         applySingleSetting,
-        // Individual controls for feature lifecycle
         enableDisableChat, stopChat,
         enableSmallerSidebar, stopSidebar,
         enableResponsiveCards, stopCards,
@@ -3707,4 +3704,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 21, JS lines: 3612
+// Total modules: 21, JS lines: 3609
