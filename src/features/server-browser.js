@@ -63,7 +63,7 @@ const FluxFeatureServerBrowser = (() => {
                 joinBtn.classList.add('ff-btn', 'ff-btn-sm', 'ff-btn-primary');
             }
 
-            const match = item.textContent.match(/(\d+)\s*(?:of|\\/)\s*(\d+)/);
+            const match = item.textContent.match(/(\d+)\s*(?:of|\/)\s*(\d+)/);
             if (match) {
                 const current = parseInt(match[1]);
                 const max = parseInt(match[2]);
@@ -133,7 +133,7 @@ const FluxFeatureServerBrowser = (() => {
         const items = FluxUtils.qsa(FluxConstants.SELECTORS.SERVER_ITEM);
         let hidden = 0;
         items.forEach(item => {
-            const match = item.textContent.match(/(\d+)\s*(?:of|\\/)\s*(\d+)/);
+            const match = item.textContent.match(/(\d+)\s*(?:of|\/)\s*(\d+)/);
             if (match) {
                 const current = parseInt(match[1]);
                 const max = parseInt(match[2]);
