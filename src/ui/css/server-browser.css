@@ -1,0 +1,5 @@
+/* === Server Browser Controls === */
+.ff-server-controls {
+    display: flex; gap: 8px; margin-bottom: 12px;
+    padding: 0 4px; flex-wrap: wrap;
+}

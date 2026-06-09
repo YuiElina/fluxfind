@@ -1,0 +1,25 @@
+/* === CSS Custom Properties === */
+:root {
+    --ff-bg-primary: #1f1f1f;
+    --ff-bg-secondary: #252525;
+    --ff-bg-tertiary: #2a2a2a;
+    --ff-bg-hover: #333333;
+    --ff-border: #404040;
+    --ff-border-light: #505050;
+    --ff-text-primary: #e8e8e8;
+    --ff-text-secondary: #b0b0b0;
+    --ff-text-muted: #888888;
+    --ff-accent: #6C5CE7;
+    --ff-accent-hover: #7C6CF7;
+    --ff-success: #4CAF50;
+    --ff-error: #F44336;
+    --ff-warning: #FF9800;
+    --ff-radius-sm: 6px;
+    --ff-radius-md: 8px;
+    --ff-radius-lg: 12px;
+    --ff-radius-xl: 20px;
+    --ff-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    --ff-shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
+    --ff-transition: 0.15s ease;
+    --ff-transition-slow: 0.25s ease;
+}

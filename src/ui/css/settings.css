@@ -1,0 +1,52 @@
+/* === Floating Settings Button === */
+#fluxfind-settings-btn {
+    position: fixed; bottom: 20px; right: 20px; z-index: 99999;
+    border-radius: 50%; width: 44px; height: 44px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(108,92,231,0.4);
+    background: var(--ff-accent); border: none;
+}
+
+/* === Settings Panel Layout === */
+.ff-settings-header {
+    padding: 20px 28px; border-bottom: 1px solid var(--ff-border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+}
+.ff-settings-header-title { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+
+.ff-settings-body { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+.ff-settings-sidebar {
+    width: 180px; padding: 16px 12px; border-right: 1px solid var(--ff-border);
+    flex-shrink: 0; overflow-y: auto;
+}
+
+.ff-settings-sidebar-btn {
+    width: 100%; justify-content: flex-start; margin-bottom: 4px;
+    border: none; background: transparent;
+}
+.ff-settings-sidebar-btn.ff-active { background: var(--ff-bg-hover); }
+
+.ff-settings-content { flex: 1; padding: 20px 28px; overflow-y: auto; }
+
+/* === Settings: Home Section === */
+.ff-settings-home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.ff-settings-home-title { margin: 0; font-size: 22px; font-weight: 700; }
+.ff-settings-home-version { margin: 4px 0 0; font-size: 13px; color: var(--ff-text-muted); }
+.ff-settings-home-actions { display: flex; gap: 10px; margin-bottom: 20px; }
+.ff-settings-preset-title { font-size: 14px; font-weight: 600; margin: 16px 0 10px; }
+.ff-settings-preset-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* === Settings: Generic Sections === */
+.ff-settings-section-title { font-size: 15px; font-weight: 600; margin: 0 0 14px; }
+.ff-settings-select-wrap { margin-bottom: 12px; }
+.ff-settings-select-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ff-text-secondary); }
+
+/* === Settings: About Section === */
+.ff-settings-about { text-align: center; padding: 20px 0; }
+.ff-settings-about-logo { margin-bottom: 16px; }
+.ff-settings-about-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; }
+.ff-settings-about-desc { margin: 0 0 16px; font-size: 13px; color: var(--ff-text-muted); line-height: 1.5; }
+.ff-settings-about-toggles { display: flex; gap: 8px; justify-content: center; }
+.ff-settings-about-footer { margin: 20px 0 0; font-size: 11px; color: var(--ff-text-muted); }
