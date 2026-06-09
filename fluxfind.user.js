@@ -54,7 +54,7 @@
 // ====== MODULE: utils (src/core/utils.js) ======
 /**
  * FluxFind Core Utilities
- * High-performance general utilities: debounce, throttle, memoize, batch DOM operations
+ * High-performance general utilities: debounce, throttle, memoize, batch DOM operations, waitForElement
  *
  * @module core/utils
  * @license GPL-2.0-only
@@ -63,10 +63,6 @@
 const FluxUtils = (() => {
     'use strict';
 
-    /**
-     * Debounce - delays function execution until after `wait` ms of inactivity
-     * Uses requestAnimationFrame for DOM-bound callbacks to batch layout work
-     */
     function debounce(fn, wait = 150, useRAF = false) {
         let timeout, rafId;
         return function debounced(...args) {
@@ -84,10 +80,6 @@ const FluxUtils = (() => {
         };
     }
 
-    /**
-     * Throttle - ensures function runs at most once per `limit` ms
-     * Leading edge by default (fires immediately, then cooldown)
-     */
     function throttle(fn, limit = 100) {
         let inThrottle = false, lastArgs, lastThis;
         return function throttled(...args) {
@@ -108,9 +100,6 @@ const FluxUtils = (() => {
         };
     }
 
-    /**
-     * Memoize with LRU eviction for API response caching
-     */
     function memoize(fn, maxSize = 100, ttl = 60000) {
         const cache = new Map();
         return function memoized(...args) {
@@ -118,7 +107,6 @@ const FluxUtils = (() => {
             const entry = cache.get(key);
             const now = Date.now();
             if (entry && (now - entry.time) < ttl) {
-                // Move to end (most recently used)
                 cache.delete(key);
                 cache.set(key, entry);
                 return entry.value;
@@ -126,7 +114,6 @@ const FluxUtils = (() => {
             const result = fn.apply(this, args);
             cache.set(key, { value: result, time: now });
             if (cache.size > maxSize) {
-                // Evict oldest (first inserted)
                 const firstKey = cache.keys().next().value;
                 cache.delete(firstKey);
             }
@@ -134,9 +121,6 @@ const FluxUtils = (() => {
         };
     }
 
-    /**
-     * DOM batch insert using DocumentFragment - minimizes reflow
-     */
     function batchAppend(parent, elements) {
         const fragment = document.createDocumentFragment();
         for (const el of elements) {
@@ -145,14 +129,11 @@ const FluxUtils = (() => {
         parent.appendChild(fragment);
     }
 
-    /**
-     * Safe querySelector with optional caching
-     */
     const _qsCache = new Map();
     function qs(selector, root = document, cache = false) {
         if (cache && _qsCache.has(selector)) {
             const el = _qsCache.get(selector);
-            if (el.isConnected) return el;
+            if (el && el.isConnected) return el;
             _qsCache.delete(selector);
         }
         const el = root.querySelector(selector);
@@ -164,9 +145,6 @@ const FluxUtils = (() => {
         return Array.from(root.querySelectorAll(selector));
     }
 
-    /**
-     * Observer utility - MutationObserver with automatic disconnect/reconnect
-     */
     function observeDOM(target, config, callback) {
         const observer = new MutationObserver((mutations) => {
             observer.disconnect();
@@ -177,9 +155,6 @@ const FluxUtils = (() => {
         return observer;
     }
 
-    /**
-     * Fast array chunking (avoids .slice() overhead on large arrays)
-     */
     function chunk(array, size) {
         const chunks = [];
         for (let i = 0; i < array.length; i += size) {
@@ -188,9 +163,6 @@ const FluxUtils = (() => {
         return chunks;
     }
 
-    /**
-     * Retry wrapper for async functions with exponential backoff
-     */
     async function retry(fn, maxRetries = 3, baseDelay = 500) {
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
@@ -202,55 +174,35 @@ const FluxUtils = (() => {
         }
     }
 
-    /**
-     * Run tasks in parallel with concurrency limit
-     */
     async function parallelLimit(tasks, limit = 6) {
         const results = new Array(tasks.length);
         let index = 0;
-
         async function worker() {
             while (index < tasks.length) {
                 const i = index++;
                 results[i] = await tasks[i]();
             }
         }
-
         await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
         return results;
     }
 
-    /**
-     * Lazy initializer - runs factory once, caches result
-     */
     function lazy(factory) {
         let initialized = false, value;
         return () => {
-            if (!initialized) {
-                value = factory();
-                initialized = true;
-            }
+            if (!initialized) { value = factory(); initialized = true; }
             return value;
         };
     }
 
-    /**
-     * Run-once guard for singleton-like patterns
-     */
     function once(fn) {
         let called = false, result;
         return function(...args) {
-            if (!called) {
-                called = true;
-                result = fn.apply(this, args);
-            }
+            if (!called) { called = true; result = fn.apply(this, args); }
             return result;
         };
     }
 
-    /**
-     * Fast string hash for cache keys
-     */
     function fastHash(str) {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
@@ -261,9 +213,30 @@ const FluxUtils = (() => {
         return hash;
     }
 
+    /** Wait for a DOM element matching selector to appear, with timeout */
+    function waitForElement(selector, timeout = 5000) {
+        return new Promise((resolve, reject) => {
+            const found = document.querySelector(selector);
+            if (found) return resolve(found);
+
+            const observer = new MutationObserver(() => {
+                const el = document.querySelector(selector);
+                if (el) { observer.disconnect(); clearTimeout(timer); resolve(el); }
+            });
+
+            observer.observe(document.body, { childList: true, subtree: true });
+
+            const timer = setTimeout(() => {
+                observer.disconnect();
+                reject(new Error(`Timeout waiting for: ${selector}`));
+            }, timeout);
+        });
+    }
+
     return {
         debounce, throttle, memoize, batchAppend, qs, qsa,
         observeDOM, chunk, retry, parallelLimit, lazy, once, fastHash,
+        waitForElement,
         noop: () => {}
     };
 })();
@@ -2801,16 +2774,15 @@ const FluxRouter = (() => {
 
     function start(callback) {
         if (intervalId) return;
-        lastPath = window.location.pathname + window.location.search;
+        lastPath = window.location.pathname + window.location.search + window.location.hash;
 
         intervalId = setInterval(() => {
-            const currentPath = window.location.pathname + window.location.search;
+            const currentPath = window.location.pathname + window.location.search + window.location.hash;
             if (currentPath !== lastPath) {
-                const oldPage = detectPageBasedOnPath(lastPath);
                 lastPath = currentPath;
                 const newPage = detectPage();
-                FluxLogger.debug(`Route changed: ${oldPage} -> ${newPage}`);
-                callback(newPage, oldPage);
+                FluxLogger.info(`Route changed: -> ${newPage} (${currentPath})`);
+                callback(newPage, null);
             }
         }, FluxConstants.TIMING.URL_CHECK_INTERVAL);
     }
@@ -3091,22 +3063,55 @@ const FluxFeatureEnhancements = (() => {
 
     const activeFeatures = new Set();
 
-    /* ========== 1. Disable Chat Bar ========== */
-    let chatStyleEl = null;
-    const CHAT_CSS = `#chat-header, #chat-container, .chat-windows-header, .chat-main-window,
-        [class*="chat-window"], div[class*="chat"], .chat-header, .chat-friends,
-        #chat-friends, .chat-avatar, [id*="chat"], [class*="Chat"] { display: none !important; }`;
+    /* ========== 1. Disable Chat Bar (observer-based removal, like original) ========== */
+    let chatObserver = null, chatTimeout = null;
 
     function enableDisableChat() {
         if (!FluxStorage.getBool('disablechat')) { stopChat(); return; }
         if (activeFeatures.has('chat')) return;
-        chatStyleEl = FluxDOM.injectStyleOnce('ff-disable-chat', CHAT_CSS);
+
         activeFeatures.add('chat');
-        FluxLogger.info('Chat bar disabled (CSS injected)');
+
+        function removeChat() {
+            const chat = document.getElementById('chat-container');
+            if (chat) {
+                chat.remove();
+                FluxLogger.info('Chat bar removed');
+                stopChatObserver();
+                return true;
+            }
+            return false;
+        }
+
+        if (removeChat()) return;
+
+        chatObserver = new MutationObserver(() => {
+            const chat = document.getElementById('chat-container');
+            if (chat) {
+                chat.remove();
+                FluxLogger.info('Chat bar removed (observer)');
+                stopChatObserver();
+            }
+        });
+
+        chatObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Safety timeout — stop watching after 15s
+        chatTimeout = setTimeout(() => {
+            stopChatObserver();
+            FluxLogger.info('Chat removal observer timeout');
+        }, 15000);
     }
+
+    function stopChatObserver() {
+        if (chatObserver) { chatObserver.disconnect(); chatObserver = null; }
+        if (chatTimeout) { clearTimeout(chatTimeout);
+            chatTimeout = null; }
+    }
+
     function stopChat() {
-        if (chatStyleEl) { chatStyleEl.remove(); chatStyleEl = null; }
         activeFeatures.delete('chat');
+        stopChatObserver();
     }
 
     /* ========== 2. Smaller Roblox Sidebar ========== */
@@ -3125,10 +3130,11 @@ const FluxFeatureEnhancements = (() => {
         if (activeFeatures.has('sidebar')) return;
         sidebarStyleEl = FluxDOM.injectStyleOnce('ff-smaller-sidebar', SIDEBAR_CSS);
         activeFeatures.add('sidebar');
-        FluxLogger.info('Smaller sidebar applied (CSS injected)');
+        FluxLogger.info('Smaller sidebar applied');
     }
     function stopSidebar() {
-        if (sidebarStyleEl) { sidebarStyleEl.remove(); sidebarStyleEl = null; }
+        if (sidebarStyleEl) { sidebarStyleEl.remove();
+            sidebarStyleEl = null; }
         activeFeatures.delete('sidebar');
     }
 
@@ -3148,10 +3154,11 @@ const FluxFeatureEnhancements = (() => {
         if (activeFeatures.has('cards')) return;
         cardsStyleEl = FluxDOM.injectStyleOnce('ff-responsive-cards', CARDS_CSS);
         activeFeatures.add('cards');
-        FluxLogger.info('Responsive game cards applied (CSS injected)');
+        FluxLogger.info('Responsive game cards applied');
     }
     function stopCards() {
-        if (cardsStyleEl) { cardsStyleEl.remove(); cardsStyleEl = null; }
+        if (cardsStyleEl) { cardsStyleEl.remove();
+            cardsStyleEl = null; }
         activeFeatures.delete('cards');
     }
 
@@ -3183,7 +3190,8 @@ const FluxFeatureEnhancements = (() => {
     let _termsObserver = null;
     function stopTerms() {
         activeFeatures.delete('terms');
-        if (_termsObserver) { _termsObserver.disconnect(); _termsObserver = null; }
+        if (_termsObserver) { _termsObserver.disconnect();
+            _termsObserver = null; }
     }
 
     function walkAndReplace(root) {
@@ -3210,27 +3218,24 @@ const FluxFeatureEnhancements = (() => {
         if (activeFeatures.has('friends')) return;
         activeFeatures.add('friends');
         enhanceFriendCards();
-        // Watch the whole body for React re-renders
         friendsObserver = new MutationObserver(FluxUtils.debounce(enhanceFriendCards, 500));
         friendsObserver.observe(document.body, { childList: true, subtree: true });
         FluxLogger.info('Better friends: observing for friend tiles');
     }
     function stopFriends() {
         activeFeatures.delete('friends');
-        if (friendsObserver) { friendsObserver.disconnect(); friendsObserver = null; }
+        if (friendsObserver) { friendsObserver.disconnect();
+            friendsObserver = null; }
     }
     function enhanceFriendCards() {
-        // Match Roblox's actual class: .friends-carousel-tile
         const tiles = document.querySelectorAll('.friends-carousel-tile');
         let enhanced = 0;
         tiles.forEach(tile => {
-            // Skip the "Add Friends" tile (it has no avatar-status)
             if (tile.dataset.ffFriends) return;
             tile.dataset.ffFriends = '1';
-            const gameIcon = tile.querySelector('.icon-game, [data-testid="presence-icon"]');
-            const hasGame = tile.querySelector('.avatar-status .game, .icon-game') ||
+            const hasGame = tile.querySelector('.icon-game') ||
                             tile.querySelector('[data-testid="presence-icon"].game');
-            if (hasGame || gameIcon) {
+            if (hasGame) {
                 tile.style.boxShadow = '0 0 12px rgba(108,92,231,0.3)';
                 tile.style.borderRadius = '8px';
                 tile.style.transition = 'box-shadow 0.3s ease';
@@ -3240,7 +3245,7 @@ const FluxFeatureEnhancements = (() => {
         if (enhanced > 0) FluxLogger.info(`Better friends: ${enhanced} online friends highlighted`);
     }
 
-    /* ========== 6. Better Profile Info (replaces Roblox buttons) ========== */
+    /* ========== 6. Better Profile Info ========== */
     let profileObserver = null;
     async function enableBetterProfile() {
         if (!FluxStorage.getBool('betterprofileinfo')) { stopProfile(); return; }
@@ -3252,7 +3257,8 @@ const FluxFeatureEnhancements = (() => {
     }
     function stopProfile() {
         activeFeatures.delete('profile');
-        if (profileObserver) { profileObserver.disconnect(); profileObserver = null; }
+        if (profileObserver) { profileObserver.disconnect();
+            profileObserver = null; }
     }
     async function replaceProfileStats() {
         const profileMatch = window.location.pathname.match(/\/users\/(\d+)/);
@@ -3263,7 +3269,6 @@ const FluxFeatureEnhancements = (() => {
             const stats = await FluxUsersAPI.getUserStats(targetId, 'smartsearch');
             if (!stats) return;
 
-            // Find Roblox's existing friend/follower button row
             const friendLinks = document.querySelectorAll('.flex-nowrap.gap-small a[href*="/friends"]');
             if (friendLinks.length >= 2) {
                 const friendSpan = friendLinks[0].querySelector('span');
@@ -3301,7 +3306,8 @@ const FluxFeatureEnhancements = (() => {
     }
     function stopSearch() {
         activeFeatures.delete('search');
-        if (searchObserver) { searchObserver.disconnect(); searchObserver = null; }
+        if (searchObserver) { searchObserver.disconnect();
+            searchObserver = null; }
     }
     function enhanceSearchDropdown() {
         const options = document.querySelectorAll('.navbar-search-option, .new-navbar-search-anchor');
@@ -3408,8 +3414,7 @@ const FluxFeatureEnhancements = (() => {
             if (!statContainer) return;
 
             const badge = FluxDOM.el('div', {
-                id: 'ff-vote-badge',
-                className: 'ff-badge',
+                id: 'ff-vote-badge', className: 'ff-badge',
                 style: 'margin-left:8px;display:inline-flex'
             });
             const ratio = votes.downVotes > 0 ? (votes.upVotes / (votes.upVotes + votes.downVotes) * 100).toFixed(0) : 100;
@@ -3440,6 +3445,18 @@ const FluxFeatureEnhancements = (() => {
 
     function applySingleSetting(key, value) {
         FluxLogger.info(`Enhancements: ${key}=${value}`);
+        const handlers = {
+            disablechat: enableDisableChat,
+            smallerrobloxsidebar: enableSmallerSidebar,
+            responsivegamecards: enableResponsiveCards,
+            restoreclassicterms: enableClassicTerms,
+            betterfriends: enableBetterFriends,
+            betterprofileinfo: enableBetterProfile,
+            smartsearch: enableSmartSearch,
+            quicklaunchgames: enableQuickLaunch,
+            bettergamestats: enableBetterGameStats,
+        };
+        if (handlers[key]) handlers[key]();
     }
 
     return {
@@ -3659,4 +3676,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 21, JS lines: 3564
+// Total modules: 21, JS lines: 3581

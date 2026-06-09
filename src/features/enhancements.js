@@ -13,22 +13,55 @@ const FluxFeatureEnhancements = (() => {
 
     const activeFeatures = new Set();
 
-    /* ========== 1. Disable Chat Bar ========== */
-    let chatStyleEl = null;
-    const CHAT_CSS = `#chat-header, #chat-container, .chat-windows-header, .chat-main-window,
-        [class*="chat-window"], div[class*="chat"], .chat-header, .chat-friends,
-        #chat-friends, .chat-avatar, [id*="chat"], [class*="Chat"] { display: none !important; }`;
+    /* ========== 1. Disable Chat Bar (observer-based removal, like original) ========== */
+    let chatObserver = null, chatTimeout = null;
 
     function enableDisableChat() {
         if (!FluxStorage.getBool('disablechat')) { stopChat(); return; }
         if (activeFeatures.has('chat')) return;
-        chatStyleEl = FluxDOM.injectStyleOnce('ff-disable-chat', CHAT_CSS);
+
         activeFeatures.add('chat');
-        FluxLogger.info('Chat bar disabled (CSS injected)');
+
+        function removeChat() {
+            const chat = document.getElementById('chat-container');
+            if (chat) {
+                chat.remove();
+                FluxLogger.info('Chat bar removed');
+                stopChatObserver();
+                return true;
+            }
+            return false;
+        }
+
+        if (removeChat()) return;
+
+        chatObserver = new MutationObserver(() => {
+            const chat = document.getElementById('chat-container');
+            if (chat) {
+                chat.remove();
+                FluxLogger.info('Chat bar removed (observer)');
+                stopChatObserver();
+            }
+        });
+
+        chatObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Safety timeout — stop watching after 15s
+        chatTimeout = setTimeout(() => {
+            stopChatObserver();
+            FluxLogger.info('Chat removal observer timeout');
+        }, 15000);
     }
+
+    function stopChatObserver() {
+        if (chatObserver) { chatObserver.disconnect(); chatObserver = null; }
+        if (chatTimeout) { clearTimeout(chatTimeout);
+            chatTimeout = null; }
+    }
+
     function stopChat() {
-        if (chatStyleEl) { chatStyleEl.remove(); chatStyleEl = null; }
         activeFeatures.delete('chat');
+        stopChatObserver();
     }
 
     /* ========== 2. Smaller Roblox Sidebar ========== */
@@ -47,10 +80,11 @@ const FluxFeatureEnhancements = (() => {
         if (activeFeatures.has('sidebar')) return;
         sidebarStyleEl = FluxDOM.injectStyleOnce('ff-smaller-sidebar', SIDEBAR_CSS);
         activeFeatures.add('sidebar');
-        FluxLogger.info('Smaller sidebar applied (CSS injected)');
+        FluxLogger.info('Smaller sidebar applied');
     }
     function stopSidebar() {
-        if (sidebarStyleEl) { sidebarStyleEl.remove(); sidebarStyleEl = null; }
+        if (sidebarStyleEl) { sidebarStyleEl.remove();
+            sidebarStyleEl = null; }
         activeFeatures.delete('sidebar');
     }
 
@@ -70,10 +104,11 @@ const FluxFeatureEnhancements = (() => {
         if (activeFeatures.has('cards')) return;
         cardsStyleEl = FluxDOM.injectStyleOnce('ff-responsive-cards', CARDS_CSS);
         activeFeatures.add('cards');
-        FluxLogger.info('Responsive game cards applied (CSS injected)');
+        FluxLogger.info('Responsive game cards applied');
     }
     function stopCards() {
-        if (cardsStyleEl) { cardsStyleEl.remove(); cardsStyleEl = null; }
+        if (cardsStyleEl) { cardsStyleEl.remove();
+            cardsStyleEl = null; }
         activeFeatures.delete('cards');
     }
 
@@ -105,7 +140,8 @@ const FluxFeatureEnhancements = (() => {
     let _termsObserver = null;
     function stopTerms() {
         activeFeatures.delete('terms');
-        if (_termsObserver) { _termsObserver.disconnect(); _termsObserver = null; }
+        if (_termsObserver) { _termsObserver.disconnect();
+            _termsObserver = null; }
     }
 
     function walkAndReplace(root) {
@@ -132,27 +168,24 @@ const FluxFeatureEnhancements = (() => {
         if (activeFeatures.has('friends')) return;
         activeFeatures.add('friends');
         enhanceFriendCards();
-        // Watch the whole body for React re-renders
         friendsObserver = new MutationObserver(FluxUtils.debounce(enhanceFriendCards, 500));
         friendsObserver.observe(document.body, { childList: true, subtree: true });
         FluxLogger.info('Better friends: observing for friend tiles');
     }
     function stopFriends() {
         activeFeatures.delete('friends');
-        if (friendsObserver) { friendsObserver.disconnect(); friendsObserver = null; }
+        if (friendsObserver) { friendsObserver.disconnect();
+            friendsObserver = null; }
     }
     function enhanceFriendCards() {
-        // Match Roblox's actual class: .friends-carousel-tile
         const tiles = document.querySelectorAll('.friends-carousel-tile');
         let enhanced = 0;
         tiles.forEach(tile => {
-            // Skip the "Add Friends" tile (it has no avatar-status)
             if (tile.dataset.ffFriends) return;
             tile.dataset.ffFriends = '1';
-            const gameIcon = tile.querySelector('.icon-game, [data-testid="presence-icon"]');
-            const hasGame = tile.querySelector('.avatar-status .game, .icon-game') ||
+            const hasGame = tile.querySelector('.icon-game') ||
                             tile.querySelector('[data-testid="presence-icon"].game');
-            if (hasGame || gameIcon) {
+            if (hasGame) {
                 tile.style.boxShadow = '0 0 12px rgba(108,92,231,0.3)';
                 tile.style.borderRadius = '8px';
                 tile.style.transition = 'box-shadow 0.3s ease';
@@ -162,7 +195,7 @@ const FluxFeatureEnhancements = (() => {
         if (enhanced > 0) FluxLogger.info(`Better friends: ${enhanced} online friends highlighted`);
     }
 
-    /* ========== 6. Better Profile Info (replaces Roblox buttons) ========== */
+    /* ========== 6. Better Profile Info ========== */
     let profileObserver = null;
     async function enableBetterProfile() {
         if (!FluxStorage.getBool('betterprofileinfo')) { stopProfile(); return; }
@@ -174,7 +207,8 @@ const FluxFeatureEnhancements = (() => {
     }
     function stopProfile() {
         activeFeatures.delete('profile');
-        if (profileObserver) { profileObserver.disconnect(); profileObserver = null; }
+        if (profileObserver) { profileObserver.disconnect();
+            profileObserver = null; }
     }
     async function replaceProfileStats() {
         const profileMatch = window.location.pathname.match(/\/users\/(\d+)/);
@@ -185,7 +219,6 @@ const FluxFeatureEnhancements = (() => {
             const stats = await FluxUsersAPI.getUserStats(targetId, 'smartsearch');
             if (!stats) return;
 
-            // Find Roblox's existing friend/follower button row
             const friendLinks = document.querySelectorAll('.flex-nowrap.gap-small a[href*="/friends"]');
             if (friendLinks.length >= 2) {
                 const friendSpan = friendLinks[0].querySelector('span');
@@ -223,7 +256,8 @@ const FluxFeatureEnhancements = (() => {
     }
     function stopSearch() {
         activeFeatures.delete('search');
-        if (searchObserver) { searchObserver.disconnect(); searchObserver = null; }
+        if (searchObserver) { searchObserver.disconnect();
+            searchObserver = null; }
     }
     function enhanceSearchDropdown() {
         const options = document.querySelectorAll('.navbar-search-option, .new-navbar-search-anchor');
@@ -330,8 +364,7 @@ const FluxFeatureEnhancements = (() => {
             if (!statContainer) return;
 
             const badge = FluxDOM.el('div', {
-                id: 'ff-vote-badge',
-                className: 'ff-badge',
+                id: 'ff-vote-badge', className: 'ff-badge',
                 style: 'margin-left:8px;display:inline-flex'
             });
             const ratio = votes.downVotes > 0 ? (votes.upVotes / (votes.upVotes + votes.downVotes) * 100).toFixed(0) : 100;
@@ -362,6 +395,18 @@ const FluxFeatureEnhancements = (() => {
 
     function applySingleSetting(key, value) {
         FluxLogger.info(`Enhancements: ${key}=${value}`);
+        const handlers = {
+            disablechat: enableDisableChat,
+            smallerrobloxsidebar: enableSmallerSidebar,
+            responsivegamecards: enableResponsiveCards,
+            restoreclassicterms: enableClassicTerms,
+            betterfriends: enableBetterFriends,
+            betterprofileinfo: enableBetterProfile,
+            smartsearch: enableSmartSearch,
+            quicklaunchgames: enableQuickLaunch,
+            bettergamestats: enableBetterGameStats,
+        };
+        if (handlers[key]) handlers[key]();
     }
 
     return {

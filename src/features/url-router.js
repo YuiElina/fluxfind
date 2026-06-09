@@ -36,16 +36,15 @@ const FluxRouter = (() => {
 
     function start(callback) {
         if (intervalId) return;
-        lastPath = window.location.pathname + window.location.search;
+        lastPath = window.location.pathname + window.location.search + window.location.hash;
 
         intervalId = setInterval(() => {
-            const currentPath = window.location.pathname + window.location.search;
+            const currentPath = window.location.pathname + window.location.search + window.location.hash;
             if (currentPath !== lastPath) {
-                const oldPage = detectPageBasedOnPath(lastPath);
                 lastPath = currentPath;
                 const newPage = detectPage();
-                FluxLogger.debug(`Route changed: ${oldPage} -> ${newPage}`);
-                callback(newPage, oldPage);
+                FluxLogger.info(`Route changed: -> ${newPage} (${currentPath})`);
+                callback(newPage, null);
             }
         }, FluxConstants.TIMING.URL_CHECK_INTERVAL);
     }
