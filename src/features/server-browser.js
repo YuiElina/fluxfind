@@ -57,8 +57,9 @@ const FluxFeatureServerBrowser = (() => {
         quickJoinBtn.innerHTML = `${FluxIcons.get('zap', { size: 14 })} Quick Join`;
 
         FluxUtils.batchAppend(btnContainer, [refreshBtn, filterBtn, regionSelect, quickJoinBtn]);
-        // Append controls inside the server-list-options container
-        serverContainer.appendChild(btnContainer);
+        // Insert controls as a sibling before Roblox's server list options
+        const parent = serverContainer.parentNode;
+        parent.insertBefore(btnContainer, serverContainer);
         filterButtonAdded = true;
 
         // Auto-apply saved region filter
