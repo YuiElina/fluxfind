@@ -162,11 +162,13 @@ const FluxFeatureServerBrowser = (() => {
         }
 
         if (server.playerTokens.length > 5) {
-            const placeholder = FluxDOM.el('span', {
-                className: 'avatar avatar-headshot-md player-avatar hidden-players-placeholder'
-            });
-            placeholder.textContent = '+' + (server.playerTokens.length - 5);
-            thumbsContainer.appendChild(placeholder);
+            const avatar = FluxDOM.el('span', { className: 'avatar avatar-headshot-md player-avatar' });
+            const imgContainer = FluxDOM.el('span', { className: 'thumbnail-2d-container avatar-card-image ff-thumbnail-placeholder' });
+            const inner = FluxDOM.el('span', { className: 'ff-thumbnail-placeholder-inner' });
+            inner.textContent = '+' + (server.playerTokens.length - 5);
+            imgContainer.appendChild(inner);
+            avatar.appendChild(imgContainer);
+            thumbsContainer.appendChild(avatar);
         }
 
         // Details

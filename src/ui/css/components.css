@@ -102,6 +102,28 @@
 .ff-scrollbar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
 .ff-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; }
 
+/* === Thumbnail Placeholder (+N circle) === */
+.ff-thumbnail-placeholder {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: var(--ff-bg-tertiary) !important;
+    border-radius: 50% !important;
+}
+.ff-thumbnail-placeholder-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--ff-accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+}
+
 /* === Spinner & Skeleton === */
 .ff-spinner {
     display: inline-block; width: 16px; height: 16px;

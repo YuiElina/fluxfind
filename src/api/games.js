@@ -111,33 +111,62 @@ const FluxGamesAPI = (() => {
     }
 
     /**
-     * POST to gamejoin.roblox.com/v1/join-game to get the DataCenterId for a single server.
-     * Returns region key from DATACENTER_REGION_MAP or null.
+     * POST to gamejoin.roblox.com/v1/join-game to get the server connection info.
+     * Extracts server IP for geolocation and/or DataCenterId mapping.
+     * Returns region key or null.
      */
     async function getServerRegion(gameId, serverId) {
         try {
-            // Use the www.roblox.com GET endpoint to get joinScript with UdmuxEndpoints
-            const url = `${FluxConstants.API.ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${serverId}`;
-            const resp = await fetch(url, { credentials: 'include' });
-            if (!resp.ok) {
-                FluxLogger.info('Region lookup HTTP ' + resp.status + ' for ' + serverId);
+            const csrf = FluxDOM.getCsrfToken();
+            if (!csrf) {
+                FluxLogger.info('Region lookup: no CSRF token');
                 return null;
             }
-            const data = await resp.json();
-            const joinScript = data?.joinScript;
 
-            // Primary: geolocate via server IP from UdmuxEndpoints
-            const ip = joinScript?.UdmuxEndpoints?.[0]?.Address;
+            const data = await FluxHttpClient.post(
+                `${JOIN_API}/join`,
+                { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: serverId },
+                { headers: { 'X-CSRF-TOKEN': csrf }, retries: 0 }
+            );
+
+            // Attempt 1: Direct IP fields in response
+            const ip = data?.serverIp || data?.ip || data?.address || null;
             if (ip) {
                 const geo = await FluxGeolocationAPI.getRegionFromIP(ip);
                 if (geo.region) return geo.region;
             }
 
-            // Fallback: use DataCenterId mapping
-            const dcId = String(joinScript?.DataCenterId || '');
+            // Attempt 2: Extract IP from UdmuxEndpoints array in response
+            const endpoints = data?.UdmuxEndpoints || data?.udmuxEndpoints || [];
+            if (endpoints.length > 0) {
+                const ep = endpoints[0];
+                const epIp = ep?.Address || ep?.address || ep?.ip || null;
+                if (epIp) {
+                    const geo = await FluxGeolocationAPI.getRegionFromIP(epIp);
+                    if (geo.region) return geo.region;
+                }
+            }
+
+            // Attempt 3: Parse joinScript URL for embedded IP/endpoints
+            const jsUrl = data?.joinScriptUrl || data?.joinScript || '';
+            if (jsUrl) {
+                try {
+                    const parsed = new URL(jsUrl, 'https://gamejoin.roblox.com');
+                    const qpIp = parsed.searchParams.get('serverIp') || parsed.searchParams.get('ip');
+                    if (qpIp) {
+                        const geo = await FluxGeolocationAPI.getRegionFromIP(qpIp);
+                        if (geo.region) return geo.region;
+                    }
+                } catch { /* ignore URL parse errors */ }
+            }
+
+            // Attempt 4: DataCenterId mapping from response
+            const dcId = String(data?.dataCenterId || data?.DataCenterId || data?.dcId || '');
             if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
                 return FluxConstants.DATACENTER_REGION_MAP[dcId];
             }
+
+            FluxLogger.info('Region lookup: no usable IP/DC data for ' + serverId);
         } catch (e) {
             FluxLogger.info('Region lookup error for ' + serverId + ': ' + e.message);
         }
