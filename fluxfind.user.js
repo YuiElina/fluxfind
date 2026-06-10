@@ -1403,14 +1403,27 @@ const FluxGamesAPI = (() => {
     }
 
     /**
-     * Fetch the DataCenterId for a single server jobId (used as fallback when the
-     * public servers list doesn't include DataCenterId — which it usually doesn't).
-     * Returns region key or null.
+     * Fetch the DataCenterId for a single server via the gamejoin API.
+     * POSTs to gamejoin.roblox.com/v1/join-game to retrieve the joinScript.
+     * Returns region key from DATACENTER_REGION_MAP or null.
      */
     async function getServerRegion(gameId, jobId) {
         try {
-            const url = `${ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${jobId}`;
-            const resp = await fetch(url, { credentials: 'include' });
+            const resp = await fetch(`${FluxConstants.API.JOIN_API}/join-game`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Referer': `https://www.roblox.com/games/${gameId}/`,
+                    'Origin': 'https://www.roblox.com'
+                },
+                body: JSON.stringify({
+                    placeId: gameId,
+                    isTeleport: false,
+                    gameId: jobId,
+                    gameJoinAttemptId: jobId
+                })
+            });
             if (!resp.ok) return null;
             const data = await resp.json();
             const dcId = String(data?.joinScript?.DataCenterId || '');
@@ -2997,10 +3010,7 @@ const FluxFeatureServerBrowser = (() => {
         }, 1500);
     }
 
-    async function openFilterPanel() {
-        // Trigger region scan so data is fresh when user picks a region
-        if (!regionScanDone) await scanAndCacheRegions();
-
+    function openFilterPanel() {
         FluxModals.custom((modal, close) => {
             const regionBtns = '<button class="ff-btn ff-btn-sm ff-region-btn ff-active" data-region="">All Regions</button>' +
                 Object.entries(FluxConstants.SERVER_REGIONS)
@@ -3027,6 +3037,7 @@ const FluxFeatureServerBrowser = (() => {
                 });
             });
 
+            // Pre-highlight saved region choice
             const savedRegion = FluxStorage.get('serverregionfilter');
             if (savedRegion) {
                 const activeBtn = modal.querySelector('.ff-region-btn[data-region="' + savedRegion + '"]');
@@ -3036,15 +3047,22 @@ const FluxFeatureServerBrowser = (() => {
                 }
             }
 
-            modal.querySelector('#ff-apply').addEventListener('click', () => {
+            // Apply button: scan regions THEN filter
+            modal.querySelector('#ff-apply').addEventListener('click', async () => {
                 const hideFull = modal.querySelector('#ff-f-full').checked;
                 const hideEmpty = modal.querySelector('#ff-f-empty').checked;
                 const min = parseInt(modal.querySelector('#ff-f-min').value) || 1;
                 const regionCode = modal.querySelector('.ff-region-btn.ff-active')?.dataset?.region || '';
+
+                // Only scan if user selected a region and we haven't scanned yet
+                if (regionCode && regionCache.size === 0) {
+                    FluxNotifications.show('Scanning server regions...', 'info', 3000);
+                    await scanAndCacheRegions();
+                }
+
                 applyFilters({ hideFull, hideEmpty, minPlayers: min });
                 if (regionCode) applyRegionFilter(regionCode);
                 else {
-                    // Clear region filter — show all
                     FluxStorage.set('serverregionfilter', '');
                     document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM).forEach(i => { i.style.display = ''; });
                 }
@@ -3660,4 +3678,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 21, JS lines: 3565
+// Total modules: 21, JS lines: 3583

@@ -94,14 +94,27 @@ const FluxGamesAPI = (() => {
     }
 
     /**
-     * Fetch the DataCenterId for a single server jobId (used as fallback when the
-     * public servers list doesn't include DataCenterId — which it usually doesn't).
-     * Returns region key or null.
+     * Fetch the DataCenterId for a single server via the gamejoin API.
+     * POSTs to gamejoin.roblox.com/v1/join-game to retrieve the joinScript.
+     * Returns region key from DATACENTER_REGION_MAP or null.
      */
     async function getServerRegion(gameId, jobId) {
         try {
-            const url = `${ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${jobId}`;
-            const resp = await fetch(url, { credentials: 'include' });
+            const resp = await fetch(`${FluxConstants.API.JOIN_API}/join-game`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Referer': `https://www.roblox.com/games/${gameId}/`,
+                    'Origin': 'https://www.roblox.com'
+                },
+                body: JSON.stringify({
+                    placeId: gameId,
+                    isTeleport: false,
+                    gameId: jobId,
+                    gameJoinAttemptId: jobId
+                })
+            });
             if (!resp.ok) return null;
             const data = await resp.json();
             const dcId = String(data?.joinScript?.DataCenterId || '');

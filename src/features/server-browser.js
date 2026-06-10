@@ -165,10 +165,7 @@ const FluxFeatureServerBrowser = (() => {
         }, 1500);
     }
 
-    async function openFilterPanel() {
-        // Trigger region scan so data is fresh when user picks a region
-        if (!regionScanDone) await scanAndCacheRegions();
-
+    function openFilterPanel() {
         FluxModals.custom((modal, close) => {
             const regionBtns = '<button class="ff-btn ff-btn-sm ff-region-btn ff-active" data-region="">All Regions</button>' +
                 Object.entries(FluxConstants.SERVER_REGIONS)
@@ -195,6 +192,7 @@ const FluxFeatureServerBrowser = (() => {
                 });
             });
 
+            // Pre-highlight saved region choice
             const savedRegion = FluxStorage.get('serverregionfilter');
             if (savedRegion) {
                 const activeBtn = modal.querySelector('.ff-region-btn[data-region="' + savedRegion + '"]');
@@ -204,15 +202,22 @@ const FluxFeatureServerBrowser = (() => {
                 }
             }
 
-            modal.querySelector('#ff-apply').addEventListener('click', () => {
+            // Apply button: scan regions THEN filter
+            modal.querySelector('#ff-apply').addEventListener('click', async () => {
                 const hideFull = modal.querySelector('#ff-f-full').checked;
                 const hideEmpty = modal.querySelector('#ff-f-empty').checked;
                 const min = parseInt(modal.querySelector('#ff-f-min').value) || 1;
                 const regionCode = modal.querySelector('.ff-region-btn.ff-active')?.dataset?.region || '';
+
+                // Only scan if user selected a region and we haven't scanned yet
+                if (regionCode && regionCache.size === 0) {
+                    FluxNotifications.show('Scanning server regions...', 'info', 3000);
+                    await scanAndCacheRegions();
+                }
+
                 applyFilters({ hideFull, hideEmpty, minPlayers: min });
                 if (regionCode) applyRegionFilter(regionCode);
                 else {
-                    // Clear region filter — show all
                     FluxStorage.set('serverregionfilter', '');
                     document.querySelectorAll(FluxConstants.SELECTORS.SERVER_ITEM).forEach(i => { i.style.display = ''; });
                 }
