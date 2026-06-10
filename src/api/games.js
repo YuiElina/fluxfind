@@ -117,7 +117,7 @@ const FluxGamesAPI = (() => {
     async function getServerRegion(gameId, serverId) {
         try {
             // Use the www.roblox.com GET endpoint to get joinScript with UdmuxEndpoints
-            const url = `${ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${serverId}`;
+            const url = `${FluxConstants.API.ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${serverId}`;
             const resp = await fetch(url, { credentials: 'include' });
             if (!resp.ok) {
                 FluxLogger.info('Region lookup HTTP ' + resp.status + ' for ' + serverId);

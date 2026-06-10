@@ -69,7 +69,15 @@ const FluxFeatureServerBrowser = (() => {
             FluxLogger.info('Fetching thumbnails for ' + tokenSlice.length + ' unique players...');
             try {
                 const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(tokenSlice, false);
-                thumbs.forEach(t => { if (t.imageUrl) thumbnailMap.set(t.token, t.imageUrl); });
+                thumbs.forEach(t => {
+                    if (t.imageUrl && t.requestId) {
+                        // requestId format: "index:token:AvatarHeadshot:150x150:webp:regular::"
+                        const parts = t.requestId.split(':');
+                        if (parts.length >= 2) {
+                            thumbnailMap.set(parts[1], t.imageUrl);
+                        }
+                    }
+                });
                 FluxLogger.info('Got ' + thumbnailMap.size + ' thumbnails');
             } catch (e) {
                 FluxLogger.info('Thumbnail fetch failed: ' + e.message);

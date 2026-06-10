@@ -1428,7 +1428,7 @@ const FluxGamesAPI = (() => {
     async function getServerRegion(gameId, serverId) {
         try {
             // Use the www.roblox.com GET endpoint to get joinScript with UdmuxEndpoints
-            const url = `${ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${serverId}`;
+            const url = `${FluxConstants.API.ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${serverId}`;
             const resp = await fetch(url, { credentials: 'include' });
             if (!resp.ok) {
                 FluxLogger.info('Region lookup HTTP ' + resp.status + ' for ' + serverId);
@@ -1782,7 +1782,7 @@ const FluxCatalogAPI = (() => {
 const FluxGeolocationAPI = (() => {
     'use strict';
 
-    const GEO_API = 'http://ip-api.com/json';
+    const GEO_API = 'https://ip-api.com/json';
     const CACHE = new Map();
     const CACHE_TTL = 300000; // 5 minutes
 
@@ -2985,7 +2985,15 @@ const FluxFeatureServerBrowser = (() => {
             FluxLogger.info('Fetching thumbnails for ' + tokenSlice.length + ' unique players...');
             try {
                 const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(tokenSlice, false);
-                thumbs.forEach(t => { if (t.imageUrl) thumbnailMap.set(t.token, t.imageUrl); });
+                thumbs.forEach(t => {
+                    if (t.imageUrl && t.requestId) {
+                        // requestId format: "index:token:AvatarHeadshot:150x150:webp:regular::"
+                        const parts = t.requestId.split(':');
+                        if (parts.length >= 2) {
+                            thumbnailMap.set(parts[1], t.imageUrl);
+                        }
+                    }
+                });
                 FluxLogger.info('Got ' + thumbnailMap.size + ' thumbnails');
             } catch (e) {
                 FluxLogger.info('Thumbnail fetch failed: ' + e.message);
@@ -3793,4 +3801,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 22, JS lines: 3695
+// Total modules: 22, JS lines: 3703

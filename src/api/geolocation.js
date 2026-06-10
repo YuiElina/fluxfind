@@ -10,7 +10,7 @@
 const FluxGeolocationAPI = (() => {
     'use strict';
 
-    const GEO_API = 'http://ip-api.com/json';
+    const GEO_API = 'https://ip-api.com/json';
     const CACHE = new Map();
     const CACHE_TTL = 300000; // 5 minutes
 
