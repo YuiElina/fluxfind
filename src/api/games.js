@@ -116,7 +116,7 @@ const FluxGamesAPI = (() => {
      */
     async function getServerRegion(gameId, serverId) {
         try {
-            // Use the simpler www.roblox.com GET endpoint (no CSRF needed, same as original RoLocate)
+            // Use the www.roblox.com GET endpoint to get joinScript with UdmuxEndpoints
             const url = `${ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${serverId}`;
             const resp = await fetch(url, { credentials: 'include' });
             if (!resp.ok) {
@@ -124,7 +124,17 @@ const FluxGamesAPI = (() => {
                 return null;
             }
             const data = await resp.json();
-            const dcId = String(data?.joinScript?.DataCenterId || '');
+            const joinScript = data?.joinScript;
+
+            // Primary: geolocate via server IP from UdmuxEndpoints
+            const ip = joinScript?.UdmuxEndpoints?.[0]?.Address;
+            if (ip) {
+                const geo = await FluxGeolocationAPI.getRegionFromIP(ip);
+                if (geo.region) return geo.region;
+            }
+
+            // Fallback: use DataCenterId mapping
+            const dcId = String(joinScript?.DataCenterId || '');
             if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
                 return FluxConstants.DATACENTER_REGION_MAP[dcId];
             }

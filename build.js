@@ -42,7 +42,8 @@ const SOURCES = [
     'src/api/games.js',
     'src/api/users.js',
     'src/api/thumbnails.js',
-    'src/api/catalog.js',
+        'src/api/catalog.js',
+        'src/api/geolocation.js',
 
     // UI layer
     'src/ui/icons.js',
@@ -89,6 +90,7 @@ const HEADER = `// ==UserScript==
 // @connect      groups.roblox.com
 // @connect      users.roblox.com
 // @connect      catalog.roblox.com
+// @connect      ip-api.com
 // ==/UserScript==
 
 `;
