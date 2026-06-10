@@ -1,6 +1,6 @@
 /**
  * FluxFind Thumbnails API Module
- * Player, group, catalog, and bundle thumbnail fetching with queuing and batching
+ * Player, group, catalog, and bundle thumbnail fetching via GM_xmlhttpRequest (CORS-safe).
  *
  * @module api/thumbnails
  * @license GPL-2.0-only
@@ -10,7 +10,6 @@ const FluxThumbnailsAPI = (() => {
     'use strict';
 
     const { THUMBNAILS_API } = FluxConstants.API;
-    const { PLAYER_THUMBS, GROUP_ICONS, CATALOG_ITEMS } = FluxConstants.CHUNK_SIZES;
 
     /**
      * Fetch player avatar headshots by user IDs
@@ -30,82 +29,31 @@ const FluxThumbnailsAPI = (() => {
     }
 
     /**
-     * Fetch player thumbnails via batch POST (for player tokens from server API)
-     * Uses internal queue to handle rate limits
+     * Fetch player thumbnails via batch POST using player tokens from server API.
+     * Uses FluxHttpClient.post() (GM_xmlhttpRequest) to avoid CORS issues.
+     * Format matches Roblox's thumbnail batch API:
+     *   { requestId, type: "AvatarHeadShot", targetId, token, format: "webp", size: "150x150" }
      */
-    const fetchPlayerThumbnailsByTokens = (() => {
-        const queue = [];
-        let processing = false;
-        const RATE_LIMIT_DELAY = 250;
+    async function fetchPlayerThumbnailsByTokens(playerTokens, quick = false) {
+        if (!playerTokens || !playerTokens.length) return [];
 
-        async function processQueue() {
-            if (processing) return;
-            processing = true;
+        const tokens = quick ? playerTokens.slice(0, 5) : playerTokens.slice(0, 250);
 
-            while (queue.length > 0) {
-                const { playerTokens, resolve } = queue.shift();
-                let success = false;
-                let data = [];
+        const body = tokens.map(token => ({
+            requestId: `0:${token}:AvatarHeadshot:150x150:webp:regular`,
+            type: 'AvatarHeadShot',
+            targetId: 0,
+            token,
+            format: 'webp',
+            size: '150x150'
+        }));
 
-                while (!success) {
-                    try {
-                        const response = await fetch(`${THUMBNAILS_API}/batch`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json'
-                            },
-                            body: JSON.stringify(playerTokens.map(token => ({
-                                requestId: `0:${token}:AvatarHeadshot:150x150:png:regular`,
-                                type: 'AvatarHeadShot',
-                                targetId: 0,
-                                token,
-                                format: 'png',
-                                size: '150x150'
-                            })))
-                        });
-
-                        if (response.status === 429) {
-                            await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY));
-                        } else {
-                            const json = await response.json();
-                            data = json.data || [];
-                            success = true;
-                        }
-                    } catch {
-                        data = [];
-                        success = true;
-                    }
-                }
-                resolve(data);
-            }
-            processing = false;
-        }
-
-        return function(playerTokens, quick = false) {
-            if (quick) {
-                const body = playerTokens.slice(0, 5).map(token => ({
-                    requestId: `0:${token}:AvatarHeadshot:150x150:png:regular`,
-                    type: 'AvatarHeadShot',
-                    targetId: 0,
-                    token,
-                    format: 'png',
-                    size: '150x150'
-                }));
-
-                return FluxHttpClient.post(
-                    `${THUMBNAILS_API}/batch`,
-                    body,
-                    { cache: false }
-                ).then(r => r.data || []).catch(() => []);
-            }
-
-            return new Promise(resolve => {
-                queue.push({ playerTokens, resolve });
-                processQueue();
-            });
-        };
-    })();
+        return FluxHttpClient.post(
+            `${THUMBNAILS_API}/batch`,
+            body,
+            { cache: true }
+        ).then(r => r.data || []).catch(() => []);
+    }
 
     /**
      * Fetch group icons by group IDs
