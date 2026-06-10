@@ -1,7 +1,7 @@
 /**
  * FluxFind Server Browser Feature
- * Fetches 100 public servers from Roblox API, gets region data, and replaces
- * the native server cards with enhanced ones including region badges.
+ * Fetches public servers from Roblox API, gets region data, fetches avatars,
+ * and replaces native server cards with enhanced ones.
  *
  * @module features/server-browser
  * @license GPL-2.0-only
@@ -10,11 +10,11 @@ const FluxFeatureServerBrowser = (() => {
     'use strict';
 
     let loaded = false, serverObserver = null;
-    let allServers = [];          // [{id, playing, maxPlayers, fps, ping, region, playerTokens}]
+    let allServers = [];          // [{id, playing, maxPlayers, fps, ping, region, playerTokens, thumbnails}]
     let regionScanDone = false;
     let currentGameId = 0;
 
-    /* ====== Core: Fetch servers + regions ====== */
+    /* ====== Core: Fetch servers + regions + thumbnails ====== */
     async function scanAndCacheRegions(force = false) {
         if (!force && regionScanDone) {
             FluxLogger.info('Region scan: already done, skipping');
@@ -23,34 +23,51 @@ const FluxFeatureServerBrowser = (() => {
         regionScanDone = false;
         allServers = [];
 
-        // Step 1: Fetch 100 public servers
-        FluxLogger.info('Region scan: fetching public server list...');
-        FluxNotifications.show('Fetching 100 servers from Roblox API...', 'info', 4000);
+        // Step 1: Fetch all public servers (multi-page)
+        FluxLogger.info('Region scan: fetching server list...');
+        FluxNotifications.show('Fetching servers from Roblox API...', 'info', 4000);
 
-        let data;
+        let servers;
         try {
-            data = await FluxGamesAPI.fetchPublicServers(currentGameId, 'Asc', null, 100);
+            servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, 'Asc', 300);
         } catch (e) {
-            FluxLogger.info('Region scan: public servers fetch failed: ' + e.message);
+            FluxLogger.info('Region scan: fetch failed: ' + e.message);
             FluxNotifications.show('Failed to fetch server list', 'error', 3000);
             return;
         }
 
-        const servers = data?.data || [];
         if (!servers.length) {
             FluxLogger.info('Region scan: 0 servers returned from API');
             FluxNotifications.show('No public servers found', 'warning', 3000);
             return;
         }
 
-        FluxLogger.info('Region scan: got ' + servers.length + ' servers, fetching regions...');
-        FluxNotifications.show('Scanning regions for ' + servers.length + ' servers...', 'info', 5000);
+        FluxLogger.info('Region scan: got ' + servers.length + ' servers total');
+        FluxNotifications.show('Scanning ' + servers.length + ' servers for regions...', 'info', 5000);
 
-        // Step 2: Fetch DataCenterId for each server
+        // Step 2: Fetch DataCenterId for each server (sequential, rate-limited)
         const ids = servers.map(s => s.id);
         const regionMap = await FluxGamesAPI.fetchServerRegions(currentGameId, ids);
 
-        // Step 3: Build server list with region data
+        // Step 3: Collect all player tokens and batch-fetch thumbnails
+        const allTokens = [];
+        servers.forEach(s => {
+            if (s.playerTokens && s.playerTokens.length) {
+                s.playerTokens.forEach(t => allTokens.push(t));
+            }
+        });
+
+        const thumbnailMap = new Map();
+        if (allTokens.length > 0) {
+            FluxLogger.info('Fetching thumbnails for ' + allTokens.length + ' players...');
+            const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(allTokens.slice(0, 250), false);
+            thumbs.forEach(t => {
+                if (t.imageUrl) thumbnailMap.set(t.token, t.imageUrl);
+            });
+            FluxLogger.info('Got ' + thumbnailMap.size + ' thumbnails');
+        }
+
+        // Step 4: Build server list
         allServers = servers.map(s => ({
             id: s.id,
             playing: s.playing,
@@ -58,18 +75,18 @@ const FluxFeatureServerBrowser = (() => {
             fps: s.fps,
             ping: s.ping,
             playerTokens: s.playerTokens || [],
+            thumbnails: (s.playerTokens || []).slice(0, 5).map(t => thumbnailMap.get(t) || null).filter(Boolean),
             region: regionMap.get(s.id) || null
         }));
 
         regionScanDone = true;
-        FluxLogger.info('Region scan: ' + allServers.length + ' servers, ' + regionMap.size + ' with regions');
+        FluxLogger.info('Region scan: ' + allServers.length + ' servers ready');
 
         // Apply saved region filter if any
         const savedRegion = FluxStorage.get('serverregionfilter');
         if (savedRegion) {
             applyRegionFilter(savedRegion);
         } else {
-            // Show all with badges
             renderServerCards(allServers);
         }
     }
@@ -96,20 +113,18 @@ const FluxFeatureServerBrowser = (() => {
 
     function createServerCard(server) {
         const li = FluxDOM.el('li', {
-            className: 'rbx-public-game-server-item col-md-3 col-sm-4 col-xs-6 ff-server-card'
+            className: 'rbx-public-game-server-item col-md-3 col-sm-4 col-xs-6'
         });
+
+        const cardItem = FluxDOM.el('div', { className: 'card-item card-item-public-server' });
 
         // Player thumbnails
         const thumbsContainer = FluxDOM.el('div', { className: 'player-thumbnails-container' });
-        const maxThumbs = Math.min(server.playerTokens.length, 5);
-        for (let i = 0; i < maxThumbs; i++) {
-            const token = server.playerTokens[i];
+        const maxShow = Math.min(server.thumbnails.length, 5);
+        for (let i = 0; i < maxShow; i++) {
             const avatar = FluxDOM.el('span', { className: 'avatar avatar-headshot-md player-avatar' });
             const imgContainer = FluxDOM.el('span', { className: 'thumbnail-2d-container avatar-card-image' });
-            const img = FluxDOM.el('img', {
-                src: `https://tr.rbxcdn.com/30DAY-AvatarHeadshot-${token}-Png/150/150/AvatarHeadshot/Webp/noFilter`,
-                alt: '', title: ''
-            });
+            const img = FluxDOM.el('img', { src: server.thumbnails[i], alt: '', title: '' });
             imgContainer.appendChild(img);
             avatar.appendChild(imgContainer);
             thumbsContainer.appendChild(avatar);
@@ -125,18 +140,7 @@ const FluxFeatureServerBrowser = (() => {
         // Details
         const details = FluxDOM.el('div', { className: 'rbx-public-game-server-details game-server-details' });
 
-        const status = FluxDOM.el('div', {
-            className: 'text-info rbx-game-status rbx-public-game-server-status text-overflow'
-        });
-        status.textContent = server.playing + ' of ' + server.maxPlayers + ' people max';
-
-        // Player count badge
-        const badge = FluxDOM.el('span', {
-            className: 'ff-tag ff-player-badge ' + (server.playing >= server.maxPlayers ? 'ff-tag-red' : 'ff-tag-green')
-        });
-        badge.textContent = server.playing + '/' + server.maxPlayers;
-
-        // Gauge
+        // Gauge bar
         const gaugeContainer = FluxDOM.el('div', { className: 'server-player-count-gauge border' });
         const gauge = FluxDOM.el('div', {
             className: 'gauge-inner-bar border',
@@ -148,44 +152,38 @@ const FluxFeatureServerBrowser = (() => {
         const joinSpan = FluxDOM.el('span');
         joinSpan.setAttribute('data-placeid', String(currentGameId));
         const joinBtn = FluxDOM.el('button', {
-            className: 'btn-full-width btn-control-xs rbx-public-game-server-join game-server-join-btn btn-primary-md btn-min-width ff-btn ff-btn-sm ff-btn-primary',
-            onclick: () => joinServer(server)
+            className: 'btn-full-width btn-control-xs rbx-public-game-server-join game-server-join-btn btn-primary-md btn-min-width ff-btn ff-btn-sm ff-btn-primary'
+        });
+        joinBtn.addEventListener('click', () => {
+            FluxNotifications.show('Joining server...', 'info', 2000);
+            FluxGamesAPI.joinServer(currentGameId, server.id).catch(() => {});
         });
         joinBtn.textContent = 'Join';
         joinSpan.appendChild(joinBtn);
 
-        // Server ID
-        const serverIdEl = FluxDOM.el('div', { className: 'server-id-text text-info xsmall' });
-        const shortParts = server.id.split('-');
-        serverIdEl.textContent = 'ID: ' + (shortParts[1] || '') + '-' + (shortParts[2] || '');
+        // Server ID + Region badge
+        const footer = FluxDOM.el('div', { style: 'display:flex;align-items:center;justify-content:space-between;margin-top:6px' });
+        const sid = FluxDOM.el('div', { className: 'server-id-text text-info xsmall' });
+        const sp = server.id.split('-');
+        sid.textContent = 'ID: ' + (sp[1] || '') + '-' + (sp[2] || '');
+        footer.appendChild(sid);
 
-        details.appendChild(status);
-        details.appendChild(badge);
-        details.appendChild(gaugeContainer);
-        details.appendChild(joinSpan);
-        details.appendChild(serverIdEl);
-
-        // Region badge
         if (server.region) {
             const rn = FluxConstants.SERVER_REGIONS[server.region]?.name || server.region;
-            const rb = FluxDOM.el('span', { className: 'ff-tag ff-tag-purple ff-region-badge', style: 'margin-left:4px' });
+            const rb = FluxDOM.el('span', { className: 'ff-tag ff-tag-purple', style: 'margin-left:4px' });
             rb.textContent = rn;
-            details.appendChild(rb);
+            footer.appendChild(rb);
         }
 
-        const cardItem = FluxDOM.el('div', { className: 'card-item card-item-public-server' });
+        details.appendChild(gaugeContainer);
+        details.appendChild(joinSpan);
+        details.appendChild(footer);
+
         cardItem.appendChild(thumbsContainer);
         cardItem.appendChild(details);
         li.appendChild(cardItem);
 
         return li;
-    }
-
-    function joinServer(server) {
-        FluxNotifications.show('Joining server...', 'info', 2000);
-        FluxGamesAPI.joinServer(currentGameId, server.id).catch(() => {
-            FluxNotifications.show('Failed to join server', 'error', 3000);
-        });
     }
 
     /* ====== Region Filter ====== */
@@ -276,23 +274,18 @@ const FluxFeatureServerBrowser = (() => {
             FluxNotifications.show('No servers loaded — click Refresh or Filters first', 'warning');
             return;
         }
-        const visible = allServers.filter(s => {
-            // Only join non-full servers
-            return s.playing < s.maxPlayers;
-        });
+        const visible = allServers.filter(s => s.playing < s.maxPlayers);
         if (!visible.length) { FluxNotifications.show('No available servers', 'warning'); return; }
         const pick = visible[Math.floor(Math.random() * visible.length)];
         FluxNotifications.show('Joining random server...', 'info', 2000);
-        joinServer(pick);
+        FluxGamesAPI.joinServer(currentGameId, pick.id).catch(() => {});
     }
 
     function observeServerList() {
         const c = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
         if (!c || serverObserver) return;
         serverObserver = new MutationObserver(FluxUtils.debounce(() => {
-            if (regionScanDone && allServers.length > 0) {
-                renderServerCards(allServers);
-            }
+            if (regionScanDone && allServers.length > 0) renderServerCards(allServers);
         }, 400));
         serverObserver.observe(c, { childList: true, subtree: false });
     }

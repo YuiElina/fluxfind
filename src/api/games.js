@@ -5,7 +5,6 @@
  * @module api/games
  * @license GPL-2.0-only
  */
-
 const FluxGamesAPI = (() => {
     'use strict';
 
@@ -84,7 +83,7 @@ const FluxGamesAPI = (() => {
 
     /**
      * Fetch up to 100 public servers for a game.
-     * Response: { nextPageCursor, previousPageCursor, data: [{id, maxPlayers, playing, fps, ping, ...}] }
+     * Response: { nextPageCursor, previousPageCursor, data: [{id, maxPlayers, playing, fps, ping, playerTokens, ...}] }
      */
     async function fetchPublicServers(gameId, sortOrder = 'Asc', cursor = null, limit = 100) {
         const url = `${GAMES_API}/games/${gameId}/servers/Public?sortOrder=${sortOrder}&limit=${limit}${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`;
@@ -92,19 +91,38 @@ const FluxGamesAPI = (() => {
     }
 
     /**
-     * POST to gamejoin.roblox.com/v1/join-game to get the DataCenterId for a single server.
-     * Uses GM_xmlhttpRequest (via FluxHttpClient) to bypass CORS.
-     * Returns region key or null for full/private servers.
+     * Fetch all public servers across all pages, up to maxServers.
      */
-    async function getServerRegion(gameId, jobId) {
+    async function fetchAllPublicServers(gameId, sortOrder = 'Asc', maxServers = 300) {
+        let allData = [];
+        let cursor = null;
+        let page = 0;
+
+        do {
+            const resp = await fetchPublicServers(gameId, sortOrder, cursor, 100);
+            const servers = resp?.data || [];
+            allData = allData.concat(servers);
+            cursor = resp?.nextPageCursor || null;
+            page++;
+            FluxLogger.info(`Fetched page ${page}: ${servers.length} servers (total: ${allData.length})`);
+        } while (cursor && allData.length < maxServers && page < 10);
+
+        return allData;
+    }
+
+    /**
+     * POST to gamejoin.roblox.com/v1/join-game to get the DataCenterId for a single server.
+     * Returns region key from DATACENTER_REGION_MAP or null.
+     */
+    async function getServerRegion(gameId, serverId) {
         try {
             const data = await FluxHttpClient.post(
                 `${JOIN_API}/join-game`,
                 {
                     placeId: gameId,
                     isTeleport: false,
-                    gameId: jobId,
-                    gameJoinAttemptId: jobId
+                    gameId: serverId,
+                    gameJoinAttemptId: serverId
                 },
                 {
                     headers: {
@@ -120,28 +138,33 @@ const FluxGamesAPI = (() => {
                 return FluxConstants.DATACENTER_REGION_MAP[dcId];
             }
         } catch (e) {
-            FluxLogger.info('Server region lookup failed for jobId ' + jobId + ': ' + e.message);
+            FluxLogger.info('Server region lookup failed for ' + serverId + ': ' + e.message);
         }
         return null;
     }
 
     /**
-     * Batch-fetch regions for multiple jobIds in parallel.
-     * Returns Map<jobId, regionKey>.
+     * Fetch regions for multiple server IDs using a rate-limited sequential dispatcher.
+     * 250ms delay between requests to avoid 429 errors.
+     * Returns Map<serverId, regionKey>.
      */
-    async function fetchServerRegions(gameId, jobIds) {
-        if (!jobIds || !jobIds.length) return new Map();
+    async function fetchServerRegions(gameId, serverIds) {
+        if (!serverIds || !serverIds.length) return new Map();
         const results = new Map();
         let success = 0, failed = 0;
 
-        const tasks = jobIds.map(jid => async () => {
-            const region = await getServerRegion(gameId, jid);
-            if (region) { results.set(jid, region); success++; }
+        for (let i = 0; i < serverIds.length; i++) {
+            if (i > 0) {
+                // Rate-limit delay: 250ms between requests
+                await new Promise(r => setTimeout(r, 250));
+            }
+            const sid = serverIds[i];
+            const region = await getServerRegion(gameId, sid);
+            if (region) { results.set(sid, region); success++; }
             else failed++;
-        });
+        }
 
-        await FluxUtils.parallelLimit(tasks, 4);
-        FluxLogger.info(`Regions: ${success} found, ${failed} failed (${jobIds.length} total)`);
+        FluxLogger.info(`Regions: ${success} found, ${failed} failed (${serverIds.length} total)`);
         return results;
     }
 
@@ -158,6 +181,6 @@ const FluxGamesAPI = (() => {
 
     return {
         getCurrentGameId, getUniverseId, getGameIcons, getGameDetails, getGameVotes,
-        getFavoriteGames, joinServer, getServerRegion, fetchServerRegions, fetchPublicServers, getUserPresence
+        getFavoriteGames, joinServer, getServerRegion, fetchServerRegions, fetchPublicServers, fetchAllPublicServers, getUserPresence
     };
 })();
