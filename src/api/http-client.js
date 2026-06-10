@@ -125,6 +125,7 @@ const FluxHttpClient = (() => {
                 method,
                 url,
                 headers,
+                anonymous: false,
                 onload: function(response) {
                     if (response.status === 429) {
                         reject(new Error('RATE_LIMITED'));
