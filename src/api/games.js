@@ -116,6 +116,7 @@ const FluxGamesAPI = (() => {
      */
     async function getServerRegion(gameId, serverId) {
         try {
+            const csrfToken = FluxDOM.getCsrfToken();
             const data = await FluxHttpClient.post(
                 `${JOIN_API}/join-game`,
                 {
@@ -127,6 +128,7 @@ const FluxGamesAPI = (() => {
                 {
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken || '',
                         'Referer': `https://www.roblox.com/games/${gameId}/`,
                         'Origin': 'https://www.roblox.com'
                     },

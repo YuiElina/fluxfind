@@ -9,8 +9,8 @@
 const FluxFeatureServerBrowser = (() => {
     'use strict';
 
-    let loaded = false, serverObserver = null;
-    let allServers = [];          // [{id, playing, maxPlayers, fps, ping, region, playerTokens, thumbnails}]
+    let loaded = false, serverObserver = null, _rendering = false;
+    let allServers = [];
     let regionScanDone = false;
     let currentGameId = 0;
 
@@ -23,6 +23,10 @@ const FluxFeatureServerBrowser = (() => {
         regionScanDone = false;
         allServers = [];
 
+        // Disconnect observer while we replace DOM
+        if (serverObserver) { serverObserver.disconnect();
+            serverObserver = null; }
+
         // Step 1: Fetch all public servers (multi-page)
         FluxLogger.info('Region scan: fetching server list...');
         FluxNotifications.show('Fetching servers from Roblox API...', 'info', 4000);
@@ -33,54 +37,57 @@ const FluxFeatureServerBrowser = (() => {
         } catch (e) {
             FluxLogger.info('Region scan: fetch failed: ' + e.message);
             FluxNotifications.show('Failed to fetch server list', 'error', 3000);
+            observeServerList(); // reconnect observer
             return;
         }
 
         if (!servers.length) {
             FluxLogger.info('Region scan: 0 servers returned from API');
             FluxNotifications.show('No public servers found', 'warning', 3000);
+            observeServerList();
             return;
         }
 
         FluxLogger.info('Region scan: got ' + servers.length + ' servers total');
-        FluxNotifications.show('Scanning ' + servers.length + ' servers for regions...', 'info', 5000);
+        FluxNotifications.show('Scanning regions for ' + servers.length + ' servers...', 'info', 5000);
 
-        // Step 2: Fetch DataCenterId for each server (sequential, rate-limited)
-        const ids = servers.map(s => s.id);
+        // Step 2: Fetch DataCenterId for first 30 servers (rate-limited sequential)
+        const ids = servers.map(s => s.id).slice(0, 30);
         const regionMap = await FluxGamesAPI.fetchServerRegions(currentGameId, ids);
 
-        // Step 3: Collect all player tokens and batch-fetch thumbnails
+        // Step 3: Collect all player tokens and batch-fetch thumbnails (first 100 tokens)
         const allTokens = [];
+        const tokenSet = new Set();
         servers.forEach(s => {
-            if (s.playerTokens && s.playerTokens.length) {
-                s.playerTokens.forEach(t => allTokens.push(t));
-            }
+            (s.playerTokens || []).forEach(t => { if (!tokenSet.has(t)) { tokenSet.add(t);
+                    allTokens.push(t); } });
         });
 
         const thumbnailMap = new Map();
-        if (allTokens.length > 0) {
-            FluxLogger.info('Fetching thumbnails for ' + allTokens.length + ' players...');
-            const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(allTokens.slice(0, 250), false);
-            thumbs.forEach(t => {
-                if (t.imageUrl) thumbnailMap.set(t.token, t.imageUrl);
-            });
-            FluxLogger.info('Got ' + thumbnailMap.size + ' thumbnails');
+        const tokenSlice = allTokens.slice(0, 100);
+        if (tokenSlice.length > 0) {
+            FluxLogger.info('Fetching thumbnails for ' + tokenSlice.length + ' unique players...');
+            try {
+                const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(tokenSlice, false);
+                thumbs.forEach(t => { if (t.imageUrl) thumbnailMap.set(t.token, t.imageUrl); });
+                FluxLogger.info('Got ' + thumbnailMap.size + ' thumbnails');
+            } catch (e) {
+                FluxLogger.info('Thumbnail fetch failed: ' + e.message);
+            }
         }
 
         // Step 4: Build server list
-        allServers = servers.map(s => ({
+        allServers = servers.slice(0, 30).map(s => ({
             id: s.id,
             playing: s.playing,
             maxPlayers: s.maxPlayers,
-            fps: s.fps,
-            ping: s.ping,
             playerTokens: s.playerTokens || [],
             thumbnails: (s.playerTokens || []).slice(0, 5).map(t => thumbnailMap.get(t) || null).filter(Boolean),
             region: regionMap.get(s.id) || null
         }));
 
         regionScanDone = true;
-        FluxLogger.info('Region scan: ' + allServers.length + ' servers ready');
+        FluxLogger.info('Region scan: ' + allServers.length + ' servers ready (' + regionMap.size + ' with regions)');
 
         // Apply saved region filter if any
         const savedRegion = FluxStorage.get('serverregionfilter');
@@ -89,6 +96,9 @@ const FluxFeatureServerBrowser = (() => {
         } else {
             renderServerCards(allServers);
         }
+
+        // Reconnect observer AFTER render completes
+        observeServerList();
     }
 
     /* ====== Card Rendering ====== */
@@ -103,10 +113,11 @@ const FluxFeatureServerBrowser = (() => {
             return;
         }
 
+        const fragment = document.createDocumentFragment();
         servers.forEach(server => {
-            const li = createServerCard(server);
-            container.appendChild(li);
+            fragment.appendChild(createServerCard(server));
         });
+        container.appendChild(fragment);
 
         FluxLogger.info('Rendered ' + servers.length + ' server cards');
     }
@@ -120,15 +131,28 @@ const FluxFeatureServerBrowser = (() => {
 
         // Player thumbnails
         const thumbsContainer = FluxDOM.el('div', { className: 'player-thumbnails-container' });
-        const maxShow = Math.min(server.thumbnails.length, 5);
-        for (let i = 0; i < maxShow; i++) {
-            const avatar = FluxDOM.el('span', { className: 'avatar avatar-headshot-md player-avatar' });
-            const imgContainer = FluxDOM.el('span', { className: 'thumbnail-2d-container avatar-card-image' });
-            const img = FluxDOM.el('img', { src: server.thumbnails[i], alt: '', title: '' });
-            imgContainer.appendChild(img);
-            avatar.appendChild(imgContainer);
-            thumbsContainer.appendChild(avatar);
+
+        if (server.thumbnails.length > 0) {
+            const maxShow = Math.min(server.thumbnails.length, 5);
+            for (let i = 0; i < maxShow; i++) {
+                const avatar = FluxDOM.el('span', { className: 'avatar avatar-headshot-md player-avatar' });
+                const imgContainer = FluxDOM.el('span', { className: 'thumbnail-2d-container avatar-card-image' });
+                const img = FluxDOM.el('img', { src: server.thumbnails[i], alt: '', title: '' });
+                imgContainer.appendChild(img);
+                avatar.appendChild(imgContainer);
+                thumbsContainer.appendChild(avatar);
+            }
+        } else {
+            // No thumbnails -- show player count
+            const countDiv = FluxDOM.el('div', {
+                style: 'display:flex;align-items:center;justify-content:center;min-height:48px;padding:8px'
+            });
+            const badge = FluxDOM.el('span', { className: 'ff-badge', style: 'font-size:13px;padding:6px 14px' });
+            badge.innerHTML = FluxIcons.get('users', { size: 14, color: '#fff' }) + ' ' + server.playing + ' / ' + server.maxPlayers;
+            countDiv.appendChild(badge);
+            thumbsContainer.appendChild(countDiv);
         }
+
         if (server.playerTokens.length > 5) {
             const placeholder = FluxDOM.el('span', {
                 className: 'avatar avatar-headshot-md player-avatar hidden-players-placeholder'
@@ -271,7 +295,7 @@ const FluxFeatureServerBrowser = (() => {
 
     function quickJoinRandom() {
         if (!allServers.length) {
-            FluxNotifications.show('No servers loaded — click Refresh or Filters first', 'warning');
+            FluxNotifications.show('No servers loaded', 'warning');
             return;
         }
         const visible = allServers.filter(s => s.playing < s.maxPlayers);
@@ -285,7 +309,12 @@ const FluxFeatureServerBrowser = (() => {
         const c = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
         if (!c || serverObserver) return;
         serverObserver = new MutationObserver(FluxUtils.debounce(() => {
-            if (regionScanDone && allServers.length > 0) renderServerCards(allServers);
+            // Only fire after scan is fully done
+            if (!regionScanDone) return;
+            serverObserver.disconnect();
+            serverObserver = null;
+            renderServerCards(allServers);
+            observeServerList();
         }, 400));
         serverObserver.observe(c, { childList: true, subtree: false });
     }
