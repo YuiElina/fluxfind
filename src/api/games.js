@@ -5,10 +5,11 @@
  * @module api/games
  * @license GPL-2.0-only
  */
+
 const FluxGamesAPI = (() => {
     'use strict';
 
-    const { GAMES_API, THUMBNAILS_API, ROBLOX_BASE } = FluxConstants.API;
+    const { GAMES_API, THUMBNAILS_API, JOIN_API } = FluxConstants.API;
     const { GAME_ICONS, GAME_VOTES } = FluxConstants.CHUNK_SIZES;
 
     function getCurrentGameId() {
@@ -76,77 +77,82 @@ const FluxGamesAPI = (() => {
     async function joinServer(placeId, serverId) {
         const t = FluxDOM.getCsrfToken();
         if (!t) throw new Error('No CSRF token');
-        return FluxHttpClient.post(`${FluxConstants.API.JOIN_API}/join`, {
+        return FluxHttpClient.post(`${JOIN_API}/join`, {
             placeId: FluxSanitizer.sanitizeUserId(placeId), gameId: serverId
         }, { headers: { 'X-CSRF-TOKEN': t, 'Content-Type': 'application/json' } });
     }
 
     /**
-     * Fetch up to 100 public servers for a game via the public API.
-     * Each server object includes jobId and player counts.
+     * Fetch up to 100 public servers for a game.
      * Response: { nextPageCursor, previousPageCursor, data: [{id, maxPlayers, playing, fps, ping, ...}] }
      */
     async function fetchPublicServers(gameId, sortOrder = 'Asc', cursor = null, limit = 100) {
         const url = `${GAMES_API}/games/${gameId}/servers/Public?sortOrder=${sortOrder}&limit=${limit}${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`;
-        const response = await fetch(url, { credentials: 'include' });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return response.json();
+        return FluxHttpClient.get(url, {}, { cache: false });
     }
 
     /**
-     * Fetch the DataCenterId for a single server via the gamejoin API.
-     * POSTs to gamejoin.roblox.com/v1/join-game to retrieve the joinScript.
-     * Returns region key from DATACENTER_REGION_MAP or null.
+     * POST to gamejoin.roblox.com/v1/join-game to get the DataCenterId for a single server.
+     * Uses GM_xmlhttpRequest (via FluxHttpClient) to bypass CORS.
+     * Returns region key or null for full/private servers.
      */
     async function getServerRegion(gameId, jobId) {
         try {
-            const resp = await fetch(`${FluxConstants.API.JOIN_API}/join-game`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Referer': `https://www.roblox.com/games/${gameId}/`,
-                    'Origin': 'https://www.roblox.com'
-                },
-                body: JSON.stringify({
+            const data = await FluxHttpClient.post(
+                `${JOIN_API}/join-game`,
+                {
                     placeId: gameId,
                     isTeleport: false,
                     gameId: jobId,
                     gameJoinAttemptId: jobId
-                })
-            });
-            if (!resp.ok) return null;
-            const data = await resp.json();
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Referer': `https://www.roblox.com/games/${gameId}/`,
+                        'Origin': 'https://www.roblox.com'
+                    },
+                    retries: 1
+                }
+            );
             const dcId = String(data?.joinScript?.DataCenterId || '');
             if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
                 return FluxConstants.DATACENTER_REGION_MAP[dcId];
             }
-        } catch {}
+        } catch (e) {
+            FluxLogger.info('Server region lookup failed for jobId ' + jobId + ': ' + e.message);
+        }
         return null;
     }
 
     /**
-     * Batch-fetch regions for multiple jobIds using the individual server endpoint.
-     * Used as fallback when the public list doesn't include DataCenterId.
+     * Batch-fetch regions for multiple jobIds in parallel.
+     * Returns Map<jobId, regionKey>.
      */
     async function fetchServerRegions(gameId, jobIds) {
         if (!jobIds || !jobIds.length) return new Map();
         const results = new Map();
         let success = 0, failed = 0;
+
         const tasks = jobIds.map(jid => async () => {
             const region = await getServerRegion(gameId, jid);
             if (region) { results.set(jid, region); success++; }
             else failed++;
         });
+
         await FluxUtils.parallelLimit(tasks, 4);
-        FluxLogger.info(`Regions: ${success} found, ${failed} full/private (${jobIds.length} total)`);
+        FluxLogger.info(`Regions: ${success} found, ${failed} failed (${jobIds.length} total)`);
         return results;
     }
 
     async function getUserPresence(userId) {
         const safe = FluxSanitizer.sanitizeUserId(userId);
         if (!safe) return null;
-        const d = await FluxHttpClient.post(`${FluxConstants.API.PRESENCE_API}/presence/users`, { userIds: [safe] }, { cache: false });
+        const d = await FluxHttpClient.post(
+            `${FluxConstants.API.PRESENCE_API}/presence/users`,
+            { userIds: [safe] },
+            { cache: false }
+        );
         return d.userPresences?.[0] || null;
     }
 
