@@ -1646,12 +1646,12 @@ const FluxThumbnailsAPI = (() => {
 
         const tokens = quick ? playerTokens.slice(0, 5) : playerTokens.slice(0, 250);
         const body = tokens.map((token, idx) => ({
-            requestId: `${idx}::AvatarHeadshot:48x48:png:regular::`,
+            requestId: `${idx}:${token}:AvatarHeadshot:150x150:webp:regular::`,
             type: 'AvatarHeadShot',
             targetId: 0,
             token: String(token),
-            format: 'png',
-            size: '48x48'
+            format: 'webp',
+            size: '150x150'
         }));
 
         try {

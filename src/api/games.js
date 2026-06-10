@@ -116,31 +116,20 @@ const FluxGamesAPI = (() => {
      */
     async function getServerRegion(gameId, serverId) {
         try {
-            const csrfToken = FluxDOM.getCsrfToken();
-            const data = await FluxHttpClient.post(
-                `${JOIN_API}/join-game`,
-                {
-                    placeId: gameId,
-                    isTeleport: false,
-                    gameId: serverId,
-                    gameJoinAttemptId: serverId
-                },
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken || '',
-                        'Referer': `https://www.roblox.com/games/${gameId}/`,
-                        'Origin': 'https://www.roblox.com'
-                    },
-                    retries: 1
-                }
-            );
+            // Use the simpler www.roblox.com GET endpoint (no CSRF needed, same as original RoLocate)
+            const url = `${ROBLOX_BASE}/games/${gameId}/servers/0?gameId=${gameId}&excludeFullGames=false&jobId=${serverId}`;
+            const resp = await fetch(url, { credentials: 'include' });
+            if (!resp.ok) {
+                FluxLogger.info('Region lookup HTTP ' + resp.status + ' for ' + serverId);
+                return null;
+            }
+            const data = await resp.json();
             const dcId = String(data?.joinScript?.DataCenterId || '');
             if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
                 return FluxConstants.DATACENTER_REGION_MAP[dcId];
             }
         } catch (e) {
-            FluxLogger.info('Server region lookup failed for ' + serverId + ': ' + e.message);
+            FluxLogger.info('Region lookup error for ' + serverId + ': ' + e.message);
         }
         return null;
     }

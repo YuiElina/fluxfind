@@ -29,12 +29,12 @@ const FluxThumbnailsAPI = (() => {
 
         const tokens = quick ? playerTokens.slice(0, 5) : playerTokens.slice(0, 250);
         const body = tokens.map((token, idx) => ({
-            requestId: `${idx}::AvatarHeadshot:48x48:png:regular::`,
+            requestId: `${idx}:${token}:AvatarHeadshot:150x150:webp:regular::`,
             type: 'AvatarHeadShot',
             targetId: 0,
             token: String(token),
-            format: 'png',
-            size: '48x48'
+            format: 'webp',
+            size: '150x150'
         }));
 
         try {
@@ -43,8 +43,11 @@ const FluxThumbnailsAPI = (() => {
                 body,
                 { cache: false, retries: 2 }
             );
-            FluxLogger.info('Thumbnails batch returned ' + (data?.data?.length || 0) + ' results');
-            return data?.data || [];
+            const rawData = data?.data || [];
+            // Roblox sometimes returns data as an object keyed by index instead of an array
+            const results = Array.isArray(rawData) ? rawData : Object.values(rawData);
+            FluxLogger.info('Thumbnails batch: ' + results.length + ' results parsed');
+            return results;
         } catch (e) {
             FluxLogger.info('Thumbnails batch failed: ' + e.message);
             return [];
