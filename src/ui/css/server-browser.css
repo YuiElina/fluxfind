@@ -3,3 +3,8 @@
     display: flex; gap: 8px; margin-bottom: 12px;
     padding: 0 4px; flex-wrap: wrap;
 }
+
+/* Ensure avatar can contain absolutely-positioned overflow badge */
+.player-thumbnails-container .player-avatar {
+    position: relative;
+}

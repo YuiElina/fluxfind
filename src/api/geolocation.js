@@ -64,7 +64,7 @@ const FluxGeolocationAPI = (() => {
         TN: 'eu-west-1', ET: 'eu-west-1', TZ: 'eu-west-1',
     };
 
-    /** Look up IP location with caching */
+    /** Look up IP location with caching (uses GM_xmlhttpRequest to bypass CORS) */
     async function lookupIP(ip) {
         if (!ip || ip === '0.0.0.0') return null;
 
@@ -75,11 +75,12 @@ const FluxGeolocationAPI = (() => {
         }
 
         try {
-            const resp = await fetch(`${GEO_API}/${ip}?fields=countryCode,country,city,regionName`, {
-                signal: AbortSignal.timeout(3000)
-            });
-            if (!resp.ok) return null;
-            const data = await resp.json();
+            // Use FluxHttpClient which uses GM_xmlhttpRequest (CORS-free)
+            const data = await FluxHttpClient.get(
+                `${GEO_API}/${ip}`,
+                { fields: 'countryCode,country,city,regionName' },
+                { cache: false, retries: 1 }
+            );
             if (data && data.countryCode) {
                 const region = COUNTRY_TO_REGION[data.countryCode] || null;
                 const result = {

@@ -167,6 +167,8 @@ const FluxFeatureServerBrowser = (() => {
             const children = thumbsContainer.children;
             if (children.length > 0) {
                 const lastAvatar = children[Math.min(children.length - 1, 4)];
+                // Ensure position:relative for absolute badge anchoring
+                lastAvatar.style.position = 'relative';
                 const badge = FluxDOM.el('span', { className: 'ff-overflow-badge' });
                 badge.textContent = '+' + (totalTokens - 5);
                 lastAvatar.appendChild(badge);

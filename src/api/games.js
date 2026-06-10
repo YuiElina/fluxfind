@@ -76,7 +76,7 @@ const FluxGamesAPI = (() => {
     async function joinServer(placeId, serverId) {
         const t = FluxDOM.getCsrfToken();
         if (!t) throw new Error('No CSRF token');
-        return FluxHttpClient.post(`${JOIN_API}/join-game`, {
+        return FluxHttpClient.post(`${JOIN_API}/join-game-instance`, {
             placeId: FluxSanitizer.sanitizeUserId(placeId), gameId: serverId
         }, { headers: { 'X-CSRF-TOKEN': t, 'Content-Type': 'application/json' } });
     }
@@ -124,29 +124,32 @@ const FluxGamesAPI = (() => {
             }
 
             const data = await FluxHttpClient.post(
-                `${JOIN_API}/join-game`,
-                { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: serverId },
+                `${JOIN_API}/join-game-instance`,
+                { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: serverId, isTeleport: false },
                 { headers: { 'X-CSRF-TOKEN': csrf }, retries: 0 }
             );
 
-            // join-game returns { joinScript: { UdmuxEndpoints: [{Address,Port}], DataCenterId } }
+            // Response: { joinScript: { UdmuxEndpoints: [{Address,Port}], DataCenterId, ... } }
             const js = data?.joinScript || data;
 
-            // Attempt 1: Geocode via server IP from UdmuxEndpoints
+            // Attempt 1: Geocode via server IP from UdmuxEndpoints (public IPs)
             const endpoints = js?.UdmuxEndpoints || js?.udmuxEndpoints || [];
             for (const ep of endpoints) {
                 const epIp = ep?.Address || ep?.address || null;
-                if (epIp) {
+                if (epIp && epIp !== '0.0.0.0' && !epIp.startsWith('10.') && !epIp.startsWith('127.') && !epIp.startsWith('192.168.')) {
                     const geo = await FluxGeolocationAPI.getRegionFromIP(epIp);
                     if (geo.region) return geo.region;
                 }
             }
 
-            // Attempt 2: Geocode via any raw IP field on the response
-            const ip = data?.serverIp || js?.serverIp || null;
-            if (ip) {
-                const geo = await FluxGeolocationAPI.getRegionFromIP(ip);
-                if (geo.region) return geo.region;
+            // Attempt 2: Try ServerConnections for public IPs
+            const conns = js?.ServerConnections || [];
+            for (const c of conns) {
+                const cIp = c?.Address || c?.address || null;
+                if (cIp && cIp !== '0.0.0.0' && !cIp.startsWith('10.') && !cIp.startsWith('127.') && !cIp.startsWith('192.168.')) {
+                    const geo = await FluxGeolocationAPI.getRegionFromIP(cIp);
+                    if (geo.region) return geo.region;
+                }
             }
 
             // Attempt 3: DataCenterId fallback mapping
