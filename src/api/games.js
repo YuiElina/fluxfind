@@ -76,7 +76,7 @@ const FluxGamesAPI = (() => {
     async function joinServer(placeId, serverId) {
         const t = FluxDOM.getCsrfToken();
         if (!t) throw new Error('No CSRF token');
-        return FluxHttpClient.post(`${JOIN_API}/join`, {
+        return FluxHttpClient.post(`${JOIN_API}/join-game`, {
             placeId: FluxSanitizer.sanitizeUserId(placeId), gameId: serverId
         }, { headers: { 'X-CSRF-TOKEN': t, 'Content-Type': 'application/json' } });
     }
@@ -124,44 +124,33 @@ const FluxGamesAPI = (() => {
             }
 
             const data = await FluxHttpClient.post(
-                `${JOIN_API}/join`,
+                `${JOIN_API}/join-game`,
                 { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: serverId },
                 { headers: { 'X-CSRF-TOKEN': csrf }, retries: 0 }
             );
 
-            // Attempt 1: Direct IP fields in response
-            const ip = data?.serverIp || data?.ip || data?.address || null;
-            if (ip) {
-                const geo = await FluxGeolocationAPI.getRegionFromIP(ip);
-                if (geo.region) return geo.region;
-            }
+            // join-game returns { joinScript: { UdmuxEndpoints: [{Address,Port}], DataCenterId } }
+            const js = data?.joinScript || data;
 
-            // Attempt 2: Extract IP from UdmuxEndpoints array in response
-            const endpoints = data?.UdmuxEndpoints || data?.udmuxEndpoints || [];
-            if (endpoints.length > 0) {
-                const ep = endpoints[0];
-                const epIp = ep?.Address || ep?.address || ep?.ip || null;
+            // Attempt 1: Geocode via server IP from UdmuxEndpoints
+            const endpoints = js?.UdmuxEndpoints || js?.udmuxEndpoints || [];
+            for (const ep of endpoints) {
+                const epIp = ep?.Address || ep?.address || null;
                 if (epIp) {
                     const geo = await FluxGeolocationAPI.getRegionFromIP(epIp);
                     if (geo.region) return geo.region;
                 }
             }
 
-            // Attempt 3: Parse joinScript URL for embedded IP/endpoints
-            const jsUrl = data?.joinScriptUrl || data?.joinScript || '';
-            if (jsUrl) {
-                try {
-                    const parsed = new URL(jsUrl, 'https://gamejoin.roblox.com');
-                    const qpIp = parsed.searchParams.get('serverIp') || parsed.searchParams.get('ip');
-                    if (qpIp) {
-                        const geo = await FluxGeolocationAPI.getRegionFromIP(qpIp);
-                        if (geo.region) return geo.region;
-                    }
-                } catch { /* ignore URL parse errors */ }
+            // Attempt 2: Geocode via any raw IP field on the response
+            const ip = data?.serverIp || js?.serverIp || null;
+            if (ip) {
+                const geo = await FluxGeolocationAPI.getRegionFromIP(ip);
+                if (geo.region) return geo.region;
             }
 
-            // Attempt 4: DataCenterId mapping from response
-            const dcId = String(data?.dataCenterId || data?.DataCenterId || data?.dcId || '');
+            // Attempt 3: DataCenterId fallback mapping
+            const dcId = String(js?.DataCenterId || data?.DataCenterId || '');
             if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
                 return FluxConstants.DATACENTER_REGION_MAP[dcId];
             }

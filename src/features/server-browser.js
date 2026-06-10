@@ -161,14 +161,16 @@ const FluxFeatureServerBrowser = (() => {
             thumbsContainer.appendChild(countDiv);
         }
 
-        if (server.playerTokens.length > 5) {
-            const avatar = FluxDOM.el('span', { className: 'avatar avatar-headshot-md player-avatar' });
-            const imgContainer = FluxDOM.el('span', { className: 'thumbnail-2d-container avatar-card-image ff-thumbnail-placeholder' });
-            const inner = FluxDOM.el('span', { className: 'ff-thumbnail-placeholder-inner' });
-            inner.textContent = '+' + (server.playerTokens.length - 5);
-            imgContainer.appendChild(inner);
-            avatar.appendChild(imgContainer);
-            thumbsContainer.appendChild(avatar);
+        // "+N" overlay badge on the last avatar when there are more than 5 players
+        const totalTokens = server.playerTokens.length;
+        if (totalTokens > 5) {
+            const children = thumbsContainer.children;
+            if (children.length > 0) {
+                const lastAvatar = children[Math.min(children.length - 1, 4)];
+                const badge = FluxDOM.el('span', { className: 'ff-overflow-badge' });
+                badge.textContent = '+' + (totalTokens - 5);
+                lastAvatar.appendChild(badge);
+            }
         }
 
         // Details

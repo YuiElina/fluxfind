@@ -102,26 +102,24 @@
 .ff-scrollbar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
 .ff-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; }
 
-/* === Thumbnail Placeholder (+N circle) === */
-.ff-thumbnail-placeholder {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    background: var(--ff-bg-tertiary) !important;
-    border-radius: 50% !important;
-}
-.ff-thumbnail-placeholder-inner {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
+/* === Overflow badge (+N) overlayed on last avatar === */
+.ff-overflow-badge {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 5px;
+    border-radius: 11px;
     background: var(--ff-accent);
     color: #fff;
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 700;
-    line-height: 1;
+    line-height: 22px;
+    text-align: center;
+    border: 2px solid var(--ff-bg-primary, #fff);
+    z-index: 2;
+    pointer-events: none;
 }
 
 /* === Spinner & Skeleton === */
