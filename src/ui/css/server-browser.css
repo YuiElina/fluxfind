@@ -29,10 +29,9 @@
 
 /* Flexbox layout with centered wrapping for consistent thumbnail rows */
 .player-thumbnails-container {
-    padding: 8px 4px 4px 4px;
     display: flex !important;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: center !important;
     align-items: center;
     gap: 4px;
     width: 100%;
