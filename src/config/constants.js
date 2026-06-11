@@ -129,6 +129,23 @@ const FluxConstants = (() => {
         'me-west-1': { name: 'Middle East', coords: [25.2048, 55.2708] }
     };
 
+    /** Country proximity groups — countries in the same group are considered "nearby" */
+    const COUNTRY_GROUPS = {
+        NA: ['US', 'CA', 'MX'],
+        EU: ['GB', 'DE', 'FR', 'NL', 'IE', 'BE', 'LU', 'CH', 'AT', 'DK', 'NO', 'SE', 'FI', 'ES', 'PT', 'IT', 'PL', 'CZ', 'SK', 'HU', 'RO', 'BG', 'HR', 'SI', 'RS', 'UA', 'LT', 'LV', 'EE', 'GR', 'TR'],
+        AS: ['JP', 'KR', 'TW', 'CN', 'SG', 'HK', 'TH', 'VN', 'MY', 'PH', 'ID', 'IN', 'BD', 'LK', 'PK'],
+        OC: ['AU', 'NZ', 'FJ'],
+        SA: ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'UY', 'PY', 'BO', 'EC'],
+        ME: ['AE', 'SA', 'QA', 'KW', 'BH', 'OM', 'IL', 'JO', 'LB', 'EG', 'IQ', 'IR', 'SY', 'YE'],
+    };
+
+    function getCountryGroup(cc) {
+        for (const [group, countries] of Object.entries(COUNTRY_GROUPS)) {
+            if (countries.includes(cc)) return group;
+        }
+        return null;
+    }
+
     /** Predefined region filter chips grouped by continent */
     const REGION_CHIPS = [
         { group: 'North America', chips: [
@@ -205,6 +222,7 @@ const FluxConstants = (() => {
         VERSION,
         API, CHUNK_SIZES, RETRY, TIMING,
         SELECTORS, STORAGE_KEYS, DEFAULT_SETTINGS,
-        PRESET_CONFIGURATIONS, SERVER_REGIONS, REGION_CHIPS, DATACENTER_REGION_MAP, URL_PATTERNS
+        PRESET_CONFIGURATIONS, SERVER_REGIONS, REGION_CHIPS, DATACENTER_REGION_MAP, URL_PATTERNS,
+        COUNTRY_GROUPS, getCountryGroup
     };
 })();

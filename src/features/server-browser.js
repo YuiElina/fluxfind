@@ -225,7 +225,7 @@ const FluxFeatureServerBrowser = (() => {
         return li;
     }
 
-    /* ====== Region Filter ====== */
+    /* ====== Region Sort ====== */
     function applyRegionFilter(countryCode) {
         FluxStorage.set('serverregionfilter', countryCode);
         if (!countryCode) {
@@ -234,13 +234,32 @@ const FluxFeatureServerBrowser = (() => {
             return;
         }
 
-        const filtered = allServers.filter(s => {
-            if (!s.region) return false;
-            return s.region.countryCode === countryCode;
+        const targetGroup = FluxConstants.getCountryGroup(countryCode);
+        const label = countryCode;
+
+        // Sort by proximity: exact match > same continent > no region > other continents
+        const sorted = [...allServers].sort((a, b) => {
+            const aCC = a.region?.countryCode || null;
+            const bCC = b.region?.countryCode || null;
+            // Priority 0: exact match
+            const aExact = aCC === countryCode ? 0 : 1;
+            const bExact = bCC === countryCode ? 0 : 1;
+            if (aExact !== bExact) return aExact - bExact;
+            // Priority 1: same continent group (if targetGroup is known)
+            if (targetGroup && aCC && bCC) {
+                const aSame = FluxConstants.getCountryGroup(aCC) === targetGroup ? 0 : 1;
+                const bSame = FluxConstants.getCountryGroup(bCC) === targetGroup ? 0 : 1;
+                if (aSame !== bSame) return aSame - bSame;
+            }
+            // Priority 2: has region vs no region
+            const aHas = aCC ? 0 : 1;
+            const bHas = bCC ? 0 : 1;
+            return aHas - bHas;
         });
-        const label = allServers.find(s => s.region && s.region.countryCode === countryCode)?.region?.country || countryCode;
-        renderServerCards(filtered);
-        FluxNotifications.show(label + ': ' + filtered.length + ' servers', 'info', 3000);
+
+        const exactCount = allServers.filter(s => s.region?.countryCode === countryCode).length;
+        renderServerCards(sorted);
+        FluxNotifications.show(label + ': ' + exactCount + ' exact, ' + sorted.length + ' total', 'info', 3000);
     }
 
     /* ====== Controls ====== */
