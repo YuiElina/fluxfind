@@ -1387,11 +1387,9 @@ const FluxGamesAPI = (() => {
     }
 
     async function joinServer(placeId, serverId) {
-        const t = FluxDOM.getCsrfToken();
-        if (!t) throw new Error('No CSRF token');
         return FluxHttpClient.post(`${JOIN_API}/join-game-instance`, {
             placeId: FluxSanitizer.sanitizeUserId(placeId), gameId: serverId
-        }, { headers: { 'X-CSRF-TOKEN': t, 'Content-Type': 'application/json' } });
+        }, { headers: { 'User-Agent': 'Roblox/WinInet' } });
     }
 
     /**
@@ -1430,16 +1428,10 @@ const FluxGamesAPI = (() => {
      */
     async function getServerRegion(gameId, serverId) {
         try {
-            const csrf = FluxDOM.getCsrfToken();
-            if (!csrf) {
-                FluxLogger.info('Region lookup: no CSRF token');
-                return null;
-            }
-
             const data = await FluxHttpClient.post(
                 `${JOIN_API}/join-game-instance`,
-                { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: serverId, isTeleport: false },
-                { headers: { 'X-CSRF-TOKEN': csrf }, retries: 0 }
+                { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: serverId },
+                { headers: { 'User-Agent': 'Roblox/WinInet' }, retries: 0 }
             );
 
             // Debug: log what we got back
@@ -3843,4 +3835,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 22, JS lines: 3743
+// Total modules: 22, JS lines: 3735
