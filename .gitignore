@@ -1,4 +1,3 @@
 node_modules/
 sourceCode/*
 .DS_Store
-dist/
