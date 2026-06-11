@@ -330,7 +330,7 @@ const FluxFeatureServerBrowser = (() => {
                 nearestBtn.disabled = true;
                 nearestBtn.textContent = 'Detecting...';
                 try {
-                    const selfData = await FluxHttpClient.get('https://ip-api.com/json', { fields: 'countryCode' }, { cache: false });
+                    const selfData = await FluxHttpClient.get('http://ip-api.com/json', { fields: 'countryCode' }, { cache: false });
                     if (selfData && selfData.countryCode) {
                         const cc = selfData.countryCode;
                         const match = modal.querySelector('.ff-region-chip[data-cc="' + cc + '"]');
