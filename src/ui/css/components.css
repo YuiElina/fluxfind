@@ -26,6 +26,9 @@
 }
 .ff-input:focus, .ff-select:focus { border-color: var(--ff-accent); }
 .ff-input { width: 100%; box-sizing: border-box; }
+.ff-input[type="number"] { -moz-appearance: textfield; }
+.ff-input[type="number"]::-webkit-inner-spin-button,
+.ff-input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .ff-select { cursor: pointer; }
 
 .ff-checkbox-wrapper {
