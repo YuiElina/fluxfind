@@ -3270,6 +3270,12 @@ const FluxFeatureServerBrowser = (() => {
 
             modal.querySelector('#ff-apply').addEventListener('click', async () => {
                 const cc = modal.querySelector('.ff-region-chip.ff-active')?.dataset?.cc || '';
+
+                if (cc && !regionScanDone) {
+                    FluxNotifications.show('Scanning servers for region data...', 'info', 5000);
+                    await scanAndCacheRegions();
+                }
+
                 applyRegionFilter(cc);
                 close();
             });
@@ -3860,4 +3866,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 22, JS lines: 3762
+// Total modules: 22, JS lines: 3768
