@@ -168,6 +168,9 @@ function build() {
     // Step 2: Build the full output
     let output = HEADER;
 
+    // IIFE start — prevents const redeclaration on SPA re-execution
+    output += '(function() {\n"use strict";\n';
+
     // Add the GPL v2 license header
     output += `/**
  * FluxFind - Enhanced Roblox Server Browser & Utility Suite
@@ -228,11 +231,12 @@ function build() {
         totalLines += lines;
     }
 
-    // Final safety wrapper
+    // Final safety wrapper + IIFE close
     output += `
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
 // Total modules: ${totalModules}, JS lines: ${totalLines}
+})();
 `;
 
     if (errors > 0) {

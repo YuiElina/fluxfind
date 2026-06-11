@@ -28,6 +28,8 @@
 // @connect      ip-api.com
 // ==/UserScript==
 
+(function() {
+"use strict";
 /**
  * FluxFind - Enhanced Roblox Server Browser & Utility Suite
  * Copyright (C) 2026  FluxFind Contributors
@@ -3907,3 +3909,4 @@ if (document.readyState === 'loading') {
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
 // Total modules: 22, JS lines: 3808
+})();
