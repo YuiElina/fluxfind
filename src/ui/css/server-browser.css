@@ -51,3 +51,9 @@
     align-items: center;
     justify-content: center;
 }
+
+
+.rbx-public-game-server-item-container {
+    display: flex;
+    flex-wrap: wrap;
+}
