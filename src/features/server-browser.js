@@ -71,12 +71,8 @@ const FluxFeatureServerBrowser = (() => {
             try {
                 const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(tokenSlice, false);
                 thumbs.forEach(t => {
-                    if (t.imageUrl && t.requestId) {
-                        // requestId format: "index:token:AvatarHeadshot:150x150:webp:regular::"
-                        const parts = t.requestId.split(':');
-                        if (parts.length >= 2) {
-                            thumbnailMap.set(parts[1], t.imageUrl);
-                        }
+                    if (t.imageUrl && t.token) {
+                        thumbnailMap.set(String(t.token), t.imageUrl);
                     }
                 });
                 FluxLogger.info('Got ' + thumbnailMap.size + ' thumbnails');
@@ -142,25 +138,31 @@ const FluxFeatureServerBrowser = (() => {
         // Player thumbnails
         const thumbsContainer = FluxDOM.el('div', { className: 'player-thumbnails-container' });
 
-        if (server.thumbnails.length > 0) {
-            const maxShow = Math.min(server.thumbnails.length, 5);
-            for (let i = 0; i < maxShow; i++) {
-                const avatar = FluxDOM.el('span', { className: 'avatar avatar-headshot-md player-avatar' });
-                const imgContainer = FluxDOM.el('span', { className: 'thumbnail-2d-container avatar-card-image' });
-                const img = FluxDOM.el('img', { src: server.thumbnails[i], alt: '', title: '' });
-                imgContainer.appendChild(img);
-                avatar.appendChild(imgContainer);
-                thumbsContainer.appendChild(avatar);
-            }
-        } else {
-            // No thumbnails -- show player count
+        if (server.thumbnails.length === 0) {
+            // No thumbnails at all -- show player count badge centered
             const countDiv = FluxDOM.el('div', {
-                style: 'display:flex;align-items:center;justify-content:center;min-height:48px;padding:8px'
+                style: 'display:flex;align-items:center;justify-content:center;min-height:56px;padding:8px'
             });
             const badge = FluxDOM.el('span', { className: 'ff-badge', style: 'font-size:13px;padding:6px 14px' });
             badge.innerHTML = FluxIcons.get('users', { size: 14, color: '#fff' }) + ' ' + server.playing + ' / ' + server.maxPlayers;
             countDiv.appendChild(badge);
             thumbsContainer.appendChild(countDiv);
+        } else {
+            // Always render 5 avatar slots for consistent card height
+            const maxAvatars = 5;
+            for (let i = 0; i < maxAvatars; i++) {
+                const avatar = FluxDOM.el('span', { className: 'avatar avatar-headshot-md player-avatar' });
+                const imgContainer = FluxDOM.el('span', { className: 'thumbnail-2d-container avatar-card-image' });
+                if (i < server.thumbnails.length) {
+                    const img = FluxDOM.el('img', { src: server.thumbnails[i], alt: '', title: '' });
+                    img.addEventListener('error', function () {
+                        this.style.display = 'none';
+                    });
+                    imgContainer.appendChild(img);
+                }
+                avatar.appendChild(imgContainer);
+                thumbsContainer.appendChild(avatar);
+            }
         }
 
         // "+N" overlay badge on the last avatar when there are more than 5 players

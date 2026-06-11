@@ -16,7 +16,7 @@
     transition: transform 0.15s ease, box-shadow 0.15s ease;
     display: flex;
     flex-direction: column;
-    min-height: 180px;
+    min-height: 200px;
 }
 .card-item-public-server:hover {
     transform: translateY(-2px);
@@ -27,14 +27,14 @@
     flex: 1;
 }
 
-/* Override Roblox flex layout with 3-column grid for thumbnail consistency */
+/* Override Roblox flex layout with fixed 5-column grid for thumbnail consistency */
 .player-thumbnails-container {
-    padding: 8px 8px 4px 8px;
+    padding: 10px 8px 4px 8px;
     display: grid !important;
-    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+    grid-template-columns: repeat(5, 1fr);
     justify-items: center;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     width: 100%;
     max-width: 100%;
     align-self: center;

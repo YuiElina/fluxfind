@@ -27,13 +27,13 @@ const FluxThumbnailsAPI = (() => {
     async function fetchPlayerThumbnailsByTokens(playerTokens, quick = false) {
         if (!playerTokens || !playerTokens.length) return [];
 
-        const tokens = quick ? playerTokens.slice(0, 5) : playerTokens.slice(0, 250);
-        const body = tokens.map((token, idx) => ({
-            requestId: `${idx}:${token}:AvatarHeadshot:150x150:webp:regular::`,
+        const tokens = quick ? playerTokens.slice(0, 5) : playerTokens.slice(0, 100);
+        const body = tokens.map(token => ({
+            requestId: `0:${token}:AvatarHeadshot:150x150:png:regular`,
             type: 'AvatarHeadShot',
             targetId: 0,
             token: String(token),
-            format: 'webp',
+            format: 'png',
             size: '150x150'
         }));
 
