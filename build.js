@@ -90,6 +90,7 @@ const HEADER = `// ==UserScript==
 // @connect      groups.roblox.com
 // @connect      users.roblox.com
 // @connect      catalog.roblox.com
+// @connect      ip-api.com
 // ==/UserScript==
 
 `;
@@ -196,17 +197,6 @@ function build() {
     let totalModules = 0;
     let totalLines = 0;
     let errors = 0;
-
-    // Embed IP region database as a global variable (before geolocation.js needs it)
-    const ipDbPath = path.resolve(__dirname, 'src/api/ip-regions.json');
-    if (fs.existsSync(ipDbPath)) {
-        const ipDbJson = fs.readFileSync(ipDbPath, 'utf-8');
-        const ipDbMin = JSON.stringify(JSON.parse(ipDbJson));
-        output += `\n// ====== EMBEDDED: IP region database (src/api/ip-regions.json) ======\n`;
-        output += `const IP_REGION_DB = ${ipDbMin};\n`;
-        const ipDbSize = (Buffer.byteLength(ipDbMin, 'utf-8') / 1024).toFixed(1);
-        console.log(`    [DATA] Embedded IP region DB: ${ipDbSize} KB (${Object.keys(JSON.parse(ipDbJson)).length} prefixes)`);
-    }
 
     for (const sourcePath of SOURCES) {
         const fullPath = path.resolve(__dirname, sourcePath);

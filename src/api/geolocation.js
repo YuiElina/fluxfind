@@ -64,47 +64,43 @@ const FluxGeolocationAPI = (() => {
         TN: 'eu-west-1', ET: 'eu-west-1', TZ: 'eu-west-1',
     };
 
-    /** Look up IP location using local database (no HTTP call, instant) */
+    /** Look up IP location using ip-api.com (GM_xmlhttpRequest, CORS-free) */
     async function lookupIP(ip) {
         if (!ip || ip === '0.0.0.0') return null;
 
-        // Check cache
         const cached = CACHE.get(ip);
         if (cached && (Date.now() - cached.t) < CACHE_TTL) {
             return cached.data;
         }
 
         try {
-            const parts = ip.split('.');
-            if (parts.length !== 4) return null;
-
-            // Try /16 prefix lookup in local database
-            const prefix16 = parts[0] + '.' + parts[1];
-            const countryCode = IP_REGION_DB[prefix16] || null;
-            if (countryCode) {
-                const region = COUNTRY_TO_REGION[countryCode] || null;
+            const data = await FluxHttpClient.get(
+                `${GEO_API}/${ip}`,
+                { fields: 'countryCode,country,city,regionName' },
+                { cache: false, retries: 1 }
+            );
+            if (data && data.countryCode) {
                 const result = {
-                    countryCode: countryCode,
-                    country: null,
-                    city: null,
-                    regionName: null,
-                    fluxRegion: region
+                    countryCode: data.countryCode,
+                    country: data.country || data.countryCode,
+                    city: data.city || null,
+                    regionName: data.regionName || null,
                 };
                 CACHE.set(ip, { data: result, t: Date.now() });
                 return result;
             }
         } catch (e) {
-            FluxLogger.info('IP local lookup failed for ' + ip + ': ' + e.message);
+            FluxLogger.info('IP geolocation failed for ' + ip + ': ' + e.message);
         }
         return null;
     }
 
-    /** Get region key from IP address (cached) */
+    /** Get region info from IP address (cached) */
     async function getRegionFromIP(ip) {
         const geo = await lookupIP(ip);
-        if (geo && geo.fluxRegion) {
-            FluxLogger.info(`IP ${ip} → ${geo.country} (${geo.fluxRegion})`);
-            return { region: geo.fluxRegion, details: geo };
+        if (geo && geo.countryCode) {
+            FluxLogger.info(`IP ${ip} → ${geo.city || geo.country} (${geo.countryCode})`);
+            return { region: geo };
         }
         FluxLogger.info(`IP ${ip} → unknown region`);
         return { region: null, details: geo };

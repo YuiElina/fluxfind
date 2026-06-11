@@ -48,20 +48,24 @@
     transform: rotate(45deg); margin-top: -1px;
 }
 
-/* === Region Filter Buttons === */
-.ff-region-btn {
-    border: 1px solid var(--ff-border) !important;
-    background: transparent !important;
-    transition: all 0.15s ease;
+/* === Region Filter Chips === */
+.ff-region-chip {
+    display: inline-flex; align-items: center;
+    padding: 4px 12px; border-radius: 16px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--ff-border);
+    background: transparent; color: var(--ff-text-secondary);
+    transition: all 0.15s ease; user-select: none;
 }
-.ff-region-btn:hover {
-    border-color: var(--ff-accent) !important;
-    background: rgba(108,92,231,0.1) !important;
+.ff-region-chip:hover {
+    border-color: var(--ff-accent);
+    background: rgba(108,92,231,0.1);
+    color: var(--ff-text-primary);
 }
-.ff-region-btn.ff-active {
-    border-color: var(--ff-accent) !important;
-    background: var(--ff-accent) !important;
-    color: #fff !important;
+.ff-region-chip.ff-active {
+    border-color: var(--ff-accent);
+    background: var(--ff-accent);
+    color: #fff;
 }
 
 /* === Misc UI === */

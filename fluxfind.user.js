@@ -25,6 +25,7 @@
 // @connect      groups.roblox.com
 // @connect      users.roblox.com
 // @connect      catalog.roblox.com
+// @connect      ip-api.com
 // ==/UserScript==
 
 /**
@@ -50,9 +51,6 @@
  * Source: https://github.com/fluxfind/fluxfind
  */
 
-
-// ====== EMBEDDED: IP region database (src/api/ip-regions.json) ======
-const IP_REGION_DB = {"3.250":"IE","3.255":"IE","3.253":"IE","54.247":"IE","54.170":"IE","54.228":"IE","54.154":"IE","34.243":"IE","52.50":"IE","54.216":"IE","18.203":"IE","3.252":"IE","54.171":"IE","34.244":"IE","54.229":"IE","3.248":"IE","18.202":"IE","3.254":"IE","108.130":"IE","52.209":"IE","108.129":"IE","54.78":"IE","34.241":"IE","34.245":"IE","54.194":"IE","52.16":"IE","3.249":"IE","54.75":"IE","34.242":"IE","34.251":"IE","54.195":"IE","18.201":"IE","34.255":"IE","34.254":"IE","52.212":"IE","34.240":"IE","52.19":"IE","34.247":"IE","54.155":"IE","54.74":"IE","54.246":"IE","52.215":"IE","54.77":"IE","54.73":"IE","52.18":"IE","52.213":"IE","52.51":"IE","54.217":"IE","34.248":"IE","34.250":"IE","34.249":"IE","54.72":"IE","34.252":"IE","63.35":"IE","79.125":"IE","52.17":"IE","63.32":"IE","54.76":"IE","52.208":"IE","52.30":"IE","34.246":"IE","176.34":"IE","34.253":"IE","52.211":"IE","3.251":"IE","18.200":"IE","52.31":"IE","52.48":"IE","52.214":"IE","54.220":"IE","63.33":"IE","52.210":"IE","52.49":"IE","63.34":"IE","18.158":"DE","3.127":"DE","63.176":"DE","3.74":"DE","63.179":"DE","52.59":"DE","3.126":"DE","3.70":"DE","3.122":"DE","3.120":"DE","3.125":"DE","3.76":"DE","63.178":"DE","18.194":"DE","3.72":"DE","63.177":"DE","35.158":"DE","52.29":"DE","54.93":"DE","35.159":"DE","3.79":"DE","18.192":"DE","18.193":"DE","3.73":"DE","3.121":"DE","3.78":"DE","18.195":"DE","3.71":"DE","3.124":"DE","52.28":"DE","35.156":"DE","18.196":"DE","18.153":"DE","3.67":"DE","18.185":"DE","18.157":"DE","18.184":"DE","3.75":"DE","18.156":"DE","18.199":"DE","3.68":"DE","3.65":"DE","18.198":"DE","18.197":"DE","52.58":"DE","3.66":"DE","3.69":"DE","3.123":"DE","18.159":"DE","3.64":"DE","3.77":"DE","52.57":"DE","35.157":"DE","128.116":"US","3.214":"US","3.223":"US","54.234":"US","54.159":"US","52.91":"US","107.22":"US","54.227":"US","35.172":"US","54.146":"US","18.234":"US","54.167":"US","184.73":"US","54.90":"US","34.230":"US","44.222":"US","44.223":"US","13.220":"US","54.81":"US","54.91":"US","54.208":"US","44.203":"US","98.87":"US","34.229":"US","100.29":"US","34.227":"US","18.212":"US","13.218":"US","54.226":"US","44.202":"US","52.23":"US","98.86":"US","54.211":"US","54.196":"US","3.87":"US","54.82":"US","3.80":"US","54.164":"US","3.93":"US","52.201":"US","54.175":"US","13.222":"US","100.24":"US","54.197":"US","44.204":"US","3.90":"US","18.208":"US","34.201":"US","3.237":"US","3.83":"US","54.145":"US","44.212":"US","3.95":"US","3.94":"US","35.170":"US","18.207":"US","52.206":"US","54.86":"US","18.209":"US","3.91":"US","13.217":"US","44.201":"US","13.221":"US","98.81":"US","54.163":"US","34.224":"US","34.204":"US","54.152":"US","54.204":"US","54.174":"US","3.88":"US","3.89":"US","54.242":"US","34.203":"US","54.210":"US","54.80":"US","34.228":"US","52.90":"US","54.198":"US","75.101":"US","54.147":"US","23.23":"US","3.92":"US","35.175":"US","34.234":"US","18.204":"US","34.207":"US","54.205":"US","44.200":"US","54.173":"US","54.221":"US","3.81":"US","100.26":"US","3.231":"US","18.232":"US","18.215":"US","54.160":"US","204.236":"US","3.86":"US","98.80":"US","54.166":"US","34.239":"US","52.55":"US","34.233":"US","54.85":"US","35.173":"US","54.237":"US","3.224":"US","54.89":"US","44.215":"US","3.84":"US","52.200":"US","18.206":"US","54.161":"US","13.219":"US","3.85":"US","100.27":"US","44.197":"US","98.84":"US","23.20":"US","54.209":"US","3.208":"US","18.236":"US","35.162":"US","18.237":"US","44.245":"US","44.243":"US","44.251":"US","35.92":"US","35.93":"US","54.149":"US","35.160":"US","35.95":"US","34.211":"US","54.70":"US","35.91":"US","54.184":"US","34.209":"US","44.244":"US","35.89":"US","54.190":"US","34.223":"US","35.86":"US","52.36":"US","44.252":"US","52.33":"US","35.80":"US","35.165":"US","54.189":"US","54.202":"US","52.34":"US","52.13":"US","52.43":"US","34.215":"US","54.186":"US","34.222":"US","52.41":"US","54.187":"US","34.210":"US","35.167":"US","34.218":"US","52.10":"US","44.234":"US","34.212":"US","44.248":"US","35.85":"US","35.88":"US","54.191":"US","52.42":"US","35.163":"US","18.246":"US","44.233":"US","54.71":"US","52.12":"US","52.38":"US","52.88":"US","35.81":"US","52.24":"US","52.39":"US","54.244":"US","54.218":"US","54.188":"US","54.214":"US","52.26":"US","100.20":"US","54.213":"US","52.35":"US","35.164":"US","52.25":"US","52.40":"US","44.226":"US","50.112":"US","44.242":"US","52.11":"US","54.200":"US","34.208":"US","52.32":"US","35.161":"US","52.27":"US","35.84":"US","35.166":"US","44.229":"US","54.203":"US","52.89":"US","52.37":"US","54.148":"US","35.155":"US","54.69":"US","35.83":"US","44.235":"US","35.82":"US","44.228":"US","44.238":"US","52.15":"US","18.223":"US","3.146":"US","52.14":"US","18.217":"US","13.59":"US","3.21":"US","3.139":"US","18.220":"US","3.140":"US","18.188":"US","18.222":"US","3.128":"US","3.149":"US","3.22":"US","3.12":"US","3.144":"US","3.138":"US","3.16":"US","18.191":"US","18.216":"US","3.145":"US","3.133":"US","3.141":"US","18.224":"US","3.15":"US","3.148":"US","18.119":"US","18.221":"US","3.129":"US","3.142":"US","18.118":"US","3.143":"US","3.17":"US","3.20":"US","18.218":"US","13.58":"US","18.227":"US","3.135":"US","18.190":"US","18.189":"US","18.226":"US","3.23":"US","18.117":"US","18.219":"US","18.116":"US","3.134":"US","3.19":"US","3.136":"US","3.131":"US","18.225":"US","3.137":"US","3.147":"US","3.14":"US","3.18":"US","3.132":"US","13.113":"JP","13.114":"JP","13.115":"JP","13.158":"JP","13.230":"JP","13.231":"JP","18.176":"JP","18.179":"JP","18.180":"JP","18.182":"JP","18.183":"JP","3.112":"JP","3.113":"JP","35.72":"JP","35.73":"JP","35.74":"JP","35.75":"JP","35.76":"JP","35.77":"JP","35.78":"JP","35.79":"JP","43.206":"JP","43.207":"JP","52.192":"JP","52.193":"JP","52.194":"JP","54.150":"JP","54.199":"JP","54.249":"JP","54.250":"JP","54.64":"JP","54.65":"JP","54.95":"JP","57.180":"JP","57.181":"JP","57.183":"JP","3.114":"JP","3.115":"JP","18.177":"JP","122.248":"SG","13.212":"SG","13.213":"SG","13.214":"SG","13.215":"SG","13.228":"SG","13.229":"SG","13.250":"SG","13.251":"SG","175.41":"SG","18.136":"SG","18.138":"SG","18.139":"SG","18.140":"SG","18.141":"SG","18.142":"SG","18.143":"SG","3.0":"SG","3.1":"SG","46.137":"SG","47.128":"SG","47.129":"SG","47.130":"SG","52.221":"SG","52.74":"SG","52.76":"SG","52.77":"SG","54.151":"SG","54.169":"SG","54.179":"SG","54.251":"SG","54.254":"SG","54.255":"SG","166.117":"US","13.126":"IN","13.127":"IN","13.200":"IN","13.201":"IN","13.202":"IN","13.203":"IN","13.204":"IN","13.232":"IN","13.233":"IN","13.234":"IN","13.235":"IN","15.206":"IN","15.207":"IN","3.108":"IN","3.109":"IN","3.110":"IN","3.111":"IN","3.6":"IN","3.7":"IN","35.154":"IN","43.204":"IN","43.205":"IN","52.66":"IN","65.0":"IN","65.1":"IN","65.2":"IN","18.181":"JP"};
 
 // ====== MODULE: utils (src/core/utils.js) ======
 /**
@@ -1455,7 +1453,7 @@ const FluxGamesAPI = (() => {
                 const epIp = ep?.Address || ep?.address || null;
                 if (epIp && epIp !== '0.0.0.0' && !epIp.startsWith('10.') && !epIp.startsWith('127.') && !epIp.startsWith('192.168.')) {
                     const geo = await FluxGeolocationAPI.getRegionFromIP(epIp);
-                    if (geo.region) return geo.region;
+                    if (geo.region) return { city: geo.region.city, country: geo.region.country, countryCode: geo.region.countryCode };
                 }
             }
 
@@ -1465,17 +1463,11 @@ const FluxGamesAPI = (() => {
                 const cIp = c?.Address || c?.address || null;
                 if (cIp && cIp !== '0.0.0.0' && !cIp.startsWith('10.') && !cIp.startsWith('127.') && !cIp.startsWith('192.168.')) {
                     const geo = await FluxGeolocationAPI.getRegionFromIP(cIp);
-                    if (geo.region) return geo.region;
+                    if (geo.region) return { city: geo.region.city, country: geo.region.country, countryCode: geo.region.countryCode };
                 }
             }
 
-            // Attempt 3: DataCenterId fallback mapping
-            const dcId = String(js?.DataCenterId || data?.DataCenterId || '');
-            if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
-                return FluxConstants.DATACENTER_REGION_MAP[dcId];
-            }
-
-            FluxLogger.info('Region lookup: no usable IP/DC data for ' + serverId);
+            FluxLogger.info('Region lookup: no usable IP for ' + serverId);
         } catch (e) {
             FluxLogger.info('Region lookup error for ' + serverId + ': ' + e.message);
         }
@@ -1863,47 +1855,43 @@ const FluxGeolocationAPI = (() => {
         TN: 'eu-west-1', ET: 'eu-west-1', TZ: 'eu-west-1',
     };
 
-    /** Look up IP location using local database (no HTTP call, instant) */
+    /** Look up IP location using ip-api.com (GM_xmlhttpRequest, CORS-free) */
     async function lookupIP(ip) {
         if (!ip || ip === '0.0.0.0') return null;
 
-        // Check cache
         const cached = CACHE.get(ip);
         if (cached && (Date.now() - cached.t) < CACHE_TTL) {
             return cached.data;
         }
 
         try {
-            const parts = ip.split('.');
-            if (parts.length !== 4) return null;
-
-            // Try /16 prefix lookup in local database
-            const prefix16 = parts[0] + '.' + parts[1];
-            const countryCode = IP_REGION_DB[prefix16] || null;
-            if (countryCode) {
-                const region = COUNTRY_TO_REGION[countryCode] || null;
+            const data = await FluxHttpClient.get(
+                `${GEO_API}/${ip}`,
+                { fields: 'countryCode,country,city,regionName' },
+                { cache: false, retries: 1 }
+            );
+            if (data && data.countryCode) {
                 const result = {
-                    countryCode: countryCode,
-                    country: null,
-                    city: null,
-                    regionName: null,
-                    fluxRegion: region
+                    countryCode: data.countryCode,
+                    country: data.country || data.countryCode,
+                    city: data.city || null,
+                    regionName: data.regionName || null,
                 };
                 CACHE.set(ip, { data: result, t: Date.now() });
                 return result;
             }
         } catch (e) {
-            FluxLogger.info('IP local lookup failed for ' + ip + ': ' + e.message);
+            FluxLogger.info('IP geolocation failed for ' + ip + ': ' + e.message);
         }
         return null;
     }
 
-    /** Get region key from IP address (cached) */
+    /** Get region info from IP address (cached) */
     async function getRegionFromIP(ip) {
         const geo = await lookupIP(ip);
-        if (geo && geo.fluxRegion) {
-            FluxLogger.info(`IP ${ip} → ${geo.country} (${geo.fluxRegion})`);
-            return { region: geo.fluxRegion, details: geo };
+        if (geo && geo.countryCode) {
+            FluxLogger.info(`IP ${ip} → ${geo.city || geo.country} (${geo.countryCode})`);
+            return { region: geo };
         }
         FluxLogger.info(`IP ${ip} → unknown region`);
         return { region: null, details: geo };
@@ -2237,7 +2225,7 @@ const FluxStyles = (() => {
      * The compiled CSS string — replaced by build.js with actual CSS content.
      * Each line is a single-quoted string joined with newlines.
      */
-    const CSS = ':root { --ff-bg-primary: #1f1f1f; --ff-bg-secondary: #252525; --ff-bg-tertiary: #2a2a2a; --ff-bg-hover: #333333; --ff-border: #404040; --ff-border-light: #505050; --ff-text-primary: #e8e8e8; --ff-text-secondary: #b0b0b0; --ff-text-muted: #888888; --ff-accent: #6C5CE7; --ff-accent-hover: #7C6CF7; --ff-success: #4CAF50; --ff-error: #F44336; --ff-warning: #FF9800; --ff-radius-sm: 6px; --ff-radius-md: 8px; --ff-radius-lg: 12px; --ff-radius-xl: 20px; --ff-shadow: 0 4px 16px rgba(0,0,0,0.3); --ff-shadow-lg: 0 8px 32px rgba(0,0,0,0.4); --ff-transition: 0.15s ease; --ff-transition-slow: 0.25s ease; } .ff-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--ff-radius-sm); font: 500 13px -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; cursor: pointer; border: 1px solid var(--ff-border); background: var(--ff-bg-tertiary); color: var(--ff-text-primary); transition: background var(--ff-transition), border-color var(--ff-transition); outline: none; white-space: nowrap; line-height: 1.2; } .ff-btn:hover { background: var(--ff-bg-hover); border-color: var(--ff-border-light); } .ff-btn:active { transform: scale(0.97); } .ff-btn.ff-btn-primary { background: var(--ff-accent); border-color: var(--ff-accent); color: #fff; } .ff-btn.ff-btn-primary:hover { background: var(--ff-accent-hover); } .ff-btn.ff-btn-danger { border-color: var(--ff-error); color: var(--ff-error); } .ff-btn.ff-btn-danger:hover { background: rgba(244,67,54,0.1); } .ff-btn-sm { padding: 4px 10px; font-size: 12px; } .ff-btn-lg { padding: 10px 20px; font-size: 14px; } .ff-input, .ff-select { padding: 8px 12px; border-radius: var(--ff-radius-sm); border: 1px solid var(--ff-border); background: var(--ff-bg-primary); color: var(--ff-text-primary); font-size: 13px; transition: border-color var(--ff-transition); outline: none; } .ff-input:focus, .ff-select:focus { border-color: var(--ff-accent); } .ff-input { width: 100%; box-sizing: border-box; } .ff-select { cursor: pointer; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-region-btn { border: 1px solid var(--ff-border) !important; background: transparent !important; transition: all 0.15s ease; } .ff-region-btn:hover { border-color: var(--ff-accent) !important; background: rgba(108,92,231,0.1) !important; } .ff-region-btn.ff-active { border-color: var(--ff-accent) !important; background: var(--ff-accent) !important; color: #fff !important; } .ff-tooltip { position: relative; } .ff-tooltip::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #333; color: #e8e8e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 9999; } .ff-tooltip:hover::after { opacity: 1; } .ff-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--ff-accent); color: #fff; line-height: 1.4; } .ff-divider { height: 1px; background: var(--ff-border); margin: 12px 0; border: none; } .ff-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid var(--ff-border); background: var(--ff-bg-secondary); color: var(--ff-text-secondary); margin-left: 8px; } .ff-tag.ff-tag-green { border-color: var(--ff-success); color: var(--ff-success); background: rgba(76,175,80,0.1); } .ff-tag.ff-tag-red { border-color: var(--ff-error); color: var(--ff-error); background: rgba(244,67,54,0.1); } .ff-tag.ff-tag-yellow { border-color: var(--ff-warning); color: var(--ff-warning); background: rgba(255,152,0,0.1); } .ff-tag.ff-tag-purple { border-color: var(--ff-accent); color: var(--ff-accent); background: rgba(108,92,231,0.1); } .ff-scrollbar::-webkit-scrollbar { width: 6px; } .ff-scrollbar::-webkit-scrollbar-track { background: transparent; } .ff-scrollbar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; } .ff-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; } .ff-overflow-badge { position: absolute; bottom: -4px; right: -4px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--ff-accent); color: #fff; font-size: 11px; font-weight: 700; line-height: 22px; text-align: center; border: 2px solid var(--ff-bg-primary, #fff); z-index: 2; pointer-events: none; } .ff-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--ff-border); border-top-color: var(--ff-accent); border-radius: 50%; animation: ff-spin 0.6s linear infinite; } @keyframes ff-spin { to { transform: rotate(360deg); } } .ff-skeleton { background: linear-gradient(90deg, var(--ff-bg-tertiary) 25%, var(--ff-bg-hover) 50%, var(--ff-bg-tertiary) 75%); background-size: 200% 100%; animation: ff-shimmer 1.5s infinite; border-radius: 4px; } @keyframes ff-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } } #ff-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: none; flex-direction: column; justify-content: center; align-items: center; gap: 16px; } .ff-modal-overlay-active { display: flex !important; } .ff-modal { background: var(--ff-bg-tertiary); border-radius: var(--ff-radius-lg); box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid var(--ff-border); color: var(--ff-text-primary); z-index: 9999999; } .ff-modal.ff-modal-pop { animation: ff-popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; } .ff-modal.ff-modal-closing { animation: ff-fadeIn 0.2s ease reverse forwards; } .ff-modal.ff-modal-confirm { padding: 32px; max-width: 440px; width: 90%; } .ff-modal.ff-modal-custom { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; } .ff-modal-confirm-icon { text-align: center; margin-bottom: 16px; } .ff-modal-confirm-title { margin: 0 0 8px; font-size: 20px; font-weight: 600; text-align: center; } .ff-modal-confirm-msg { margin: 0 0 24px; font-size: 14px; color: var(--ff-text-secondary); text-align: center; line-height: 1.5; } .ff-modal-confirm-actions { display: flex; gap: 10px; justify-content: center; } @keyframes ff-fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes ff-popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } } #fluxfind-settings-btn { position: fixed; bottom: 20px; right: 20px; z-index: 99999; border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(108,92,231,0.4); background: var(--ff-accent); border: none; } .ff-toggle-wrapper { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding: 6px 0; } .ff-toggle-input { display: none; } .ff-toggle-track { position: relative; width: 44px; height: 24px; border-radius: 12px; background: #555; flex-shrink: 0; transition: background 0.25s ease; } .ff-toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); } .ff-toggle-input:checked + .ff-toggle-track { background: var(--ff-accent); } .ff-toggle-input:checked + .ff-toggle-track .ff-toggle-knob { transform: translateX(20px); } .ff-toggle-label { font-size: 13px; font-weight: 500; color: var(--ff-text-primary); line-height: 1.3; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-settings-header { padding: 20px 28px; border-bottom: 1px solid var(--ff-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; } .ff-settings-header-title { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; } .ff-settings-body { display: flex; flex: 1; overflow: hidden; min-height: 0; } .ff-settings-sidebar { width: 180px; padding: 16px 12px; border-right: 1px solid var(--ff-border); flex-shrink: 0; overflow-y: auto; } .ff-settings-sidebar-btn { width: 100%; justify-content: flex-start; margin-bottom: 4px; border: none; background: transparent; padding: 16px; } .ff-settings-sidebar-btn.ff-active { background: var(--ff-bg-hover); } .ff-settings-content { flex: 1; padding: 20px 28px; overflow-y: auto; } .ff-settings-home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; } .ff-settings-home-title { margin: 0; font-size: 22px; font-weight: 700; } .ff-settings-home-version { margin: 4px 0 0; font-size: 13px; color: var(--ff-text-muted); } .ff-settings-home-actions { display: flex; gap: 10px; margin-bottom: 20px; } .ff-settings-preset-title { font-size: 14px; font-weight: 600; margin: 16px 0 10px; } .ff-settings-preset-list { display: flex; flex-wrap: wrap; gap: 8px; } .ff-settings-section-title { font-size: 15px; font-weight: 600; margin: 0 0 14px; } .ff-settings-select-wrap { margin-bottom: 12px; } .ff-settings-select-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ff-text-secondary); } .ff-settings-about { text-align: center; padding: 20px 0; } .ff-settings-about-logo { margin-bottom: 16px; } .ff-settings-about-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; } .ff-settings-about-desc { margin: 0 0 16px; font-size: 13px; color: var(--ff-text-muted); line-height: 1.5; } .ff-settings-about-toggles { display: flex; gap: 16px; justify-content: center; } .ff-settings-about-footer { margin: 20px 0 0; font-size: 11px; color: var(--ff-text-muted); } .ff-server-controls { display: flex; gap: 8px; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; } .player-thumbnails-container .player-avatar { position: relative; }';
+    const CSS = ':root { --ff-bg-primary: #1f1f1f; --ff-bg-secondary: #252525; --ff-bg-tertiary: #2a2a2a; --ff-bg-hover: #333333; --ff-border: #404040; --ff-border-light: #505050; --ff-text-primary: #e8e8e8; --ff-text-secondary: #b0b0b0; --ff-text-muted: #888888; --ff-accent: #6C5CE7; --ff-accent-hover: #7C6CF7; --ff-success: #4CAF50; --ff-error: #F44336; --ff-warning: #FF9800; --ff-radius-sm: 6px; --ff-radius-md: 8px; --ff-radius-lg: 12px; --ff-radius-xl: 20px; --ff-shadow: 0 4px 16px rgba(0,0,0,0.3); --ff-shadow-lg: 0 8px 32px rgba(0,0,0,0.4); --ff-transition: 0.15s ease; --ff-transition-slow: 0.25s ease; } .ff-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--ff-radius-sm); font: 500 13px -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; cursor: pointer; border: 1px solid var(--ff-border); background: var(--ff-bg-tertiary); color: var(--ff-text-primary); transition: background var(--ff-transition), border-color var(--ff-transition); outline: none; white-space: nowrap; line-height: 1.2; } .ff-btn:hover { background: var(--ff-bg-hover); border-color: var(--ff-border-light); } .ff-btn:active { transform: scale(0.97); } .ff-btn.ff-btn-primary { background: var(--ff-accent); border-color: var(--ff-accent); color: #fff; } .ff-btn.ff-btn-primary:hover { background: var(--ff-accent-hover); } .ff-btn.ff-btn-danger { border-color: var(--ff-error); color: var(--ff-error); } .ff-btn.ff-btn-danger:hover { background: rgba(244,67,54,0.1); } .ff-btn-sm { padding: 4px 10px; font-size: 12px; } .ff-btn-lg { padding: 10px 20px; font-size: 14px; } .ff-input, .ff-select { padding: 8px 12px; border-radius: var(--ff-radius-sm); border: 1px solid var(--ff-border); background: var(--ff-bg-primary); color: var(--ff-text-primary); font-size: 13px; transition: border-color var(--ff-transition); outline: none; } .ff-input:focus, .ff-select:focus { border-color: var(--ff-accent); } .ff-input { width: 100%; box-sizing: border-box; } .ff-select { cursor: pointer; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-region-chip { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--ff-border); background: transparent; color: var(--ff-text-secondary); transition: all 0.15s ease; user-select: none; } .ff-region-chip:hover { border-color: var(--ff-accent); background: rgba(108,92,231,0.1); color: var(--ff-text-primary); } .ff-region-chip.ff-active { border-color: var(--ff-accent); background: var(--ff-accent); color: #fff; } .ff-tooltip { position: relative; } .ff-tooltip::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #333; color: #e8e8e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 9999; } .ff-tooltip:hover::after { opacity: 1; } .ff-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--ff-accent); color: #fff; line-height: 1.4; } .ff-divider { height: 1px; background: var(--ff-border); margin: 12px 0; border: none; } .ff-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid var(--ff-border); background: var(--ff-bg-secondary); color: var(--ff-text-secondary); margin-left: 8px; } .ff-tag.ff-tag-green { border-color: var(--ff-success); color: var(--ff-success); background: rgba(76,175,80,0.1); } .ff-tag.ff-tag-red { border-color: var(--ff-error); color: var(--ff-error); background: rgba(244,67,54,0.1); } .ff-tag.ff-tag-yellow { border-color: var(--ff-warning); color: var(--ff-warning); background: rgba(255,152,0,0.1); } .ff-tag.ff-tag-purple { border-color: var(--ff-accent); color: var(--ff-accent); background: rgba(108,92,231,0.1); } .ff-scrollbar::-webkit-scrollbar { width: 6px; } .ff-scrollbar::-webkit-scrollbar-track { background: transparent; } .ff-scrollbar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; } .ff-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; } .ff-overflow-badge { position: absolute; bottom: -4px; right: -4px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--ff-accent); color: #fff; font-size: 11px; font-weight: 700; line-height: 22px; text-align: center; border: 2px solid var(--ff-bg-primary, #fff); z-index: 2; pointer-events: none; } .ff-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--ff-border); border-top-color: var(--ff-accent); border-radius: 50%; animation: ff-spin 0.6s linear infinite; } @keyframes ff-spin { to { transform: rotate(360deg); } } .ff-skeleton { background: linear-gradient(90deg, var(--ff-bg-tertiary) 25%, var(--ff-bg-hover) 50%, var(--ff-bg-tertiary) 75%); background-size: 200% 100%; animation: ff-shimmer 1.5s infinite; border-radius: 4px; } @keyframes ff-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } } #ff-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: none; flex-direction: column; justify-content: center; align-items: center; gap: 16px; } .ff-modal-overlay-active { display: flex !important; } .ff-modal { background: var(--ff-bg-tertiary); border-radius: var(--ff-radius-lg); box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid var(--ff-border); color: var(--ff-text-primary); z-index: 9999999; } .ff-modal.ff-modal-pop { animation: ff-popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; } .ff-modal.ff-modal-closing { animation: ff-fadeIn 0.2s ease reverse forwards; } .ff-modal.ff-modal-confirm { padding: 32px; max-width: 440px; width: 90%; } .ff-modal.ff-modal-custom { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; } .ff-modal-confirm-icon { text-align: center; margin-bottom: 16px; } .ff-modal-confirm-title { margin: 0 0 8px; font-size: 20px; font-weight: 600; text-align: center; } .ff-modal-confirm-msg { margin: 0 0 24px; font-size: 14px; color: var(--ff-text-secondary); text-align: center; line-height: 1.5; } .ff-modal-confirm-actions { display: flex; gap: 10px; justify-content: center; } @keyframes ff-fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes ff-popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } } #fluxfind-settings-btn { position: fixed; bottom: 20px; right: 20px; z-index: 99999; border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(108,92,231,0.4); background: var(--ff-accent); border: none; } .ff-toggle-wrapper { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding: 6px 0; } .ff-toggle-input { display: none; } .ff-toggle-track { position: relative; width: 44px; height: 24px; border-radius: 12px; background: #555; flex-shrink: 0; transition: background 0.25s ease; } .ff-toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); } .ff-toggle-input:checked + .ff-toggle-track { background: var(--ff-accent); } .ff-toggle-input:checked + .ff-toggle-track .ff-toggle-knob { transform: translateX(20px); } .ff-toggle-label { font-size: 13px; font-weight: 500; color: var(--ff-text-primary); line-height: 1.3; } .ff-checkbox-wrapper { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; } .ff-checkbox-wrapper input[type="checkbox"] { display: none; } .ff-checkbox-custom { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--ff-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--ff-transition); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom { background: var(--ff-accent); border-color: var(--ff-accent); } .ff-checkbox-wrapper input:checked + .ff-checkbox-custom::after { content: \'\'; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -1px; } .ff-settings-header { padding: 20px 28px; border-bottom: 1px solid var(--ff-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; } .ff-settings-header-title { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; } .ff-settings-body { display: flex; flex: 1; overflow: hidden; min-height: 0; } .ff-settings-sidebar { width: 180px; padding: 16px 12px; border-right: 1px solid var(--ff-border); flex-shrink: 0; overflow-y: auto; } .ff-settings-sidebar-btn { width: 100%; justify-content: flex-start; margin-bottom: 4px; border: none; background: transparent; padding: 16px; } .ff-settings-sidebar-btn.ff-active { background: var(--ff-bg-hover); } .ff-settings-content { flex: 1; padding: 20px 28px; overflow-y: auto; } .ff-settings-home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; } .ff-settings-home-title { margin: 0; font-size: 22px; font-weight: 700; } .ff-settings-home-version { margin: 4px 0 0; font-size: 13px; color: var(--ff-text-muted); } .ff-settings-home-actions { display: flex; gap: 10px; margin-bottom: 20px; } .ff-settings-preset-title { font-size: 14px; font-weight: 600; margin: 16px 0 10px; } .ff-settings-preset-list { display: flex; flex-wrap: wrap; gap: 8px; } .ff-settings-section-title { font-size: 15px; font-weight: 600; margin: 0 0 14px; } .ff-settings-select-wrap { margin-bottom: 12px; } .ff-settings-select-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ff-text-secondary); } .ff-settings-about { text-align: center; padding: 20px 0; } .ff-settings-about-logo { margin-bottom: 16px; } .ff-settings-about-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; } .ff-settings-about-desc { margin: 0 0 16px; font-size: 13px; color: var(--ff-text-muted); line-height: 1.5; } .ff-settings-about-toggles { display: flex; gap: 16px; justify-content: center; } .ff-settings-about-footer { margin: 20px 0 0; font-size: 11px; color: var(--ff-text-muted); } .ff-server-controls { display: flex; gap: 8px; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; } .player-thumbnails-container .player-avatar { position: relative; }';
 
     function injectAll() {
         if (CSS && CSS.length > 0 && CSS !== '/* CSS is embedded at build time from src/ui/css/*.css files */') {
@@ -3151,9 +3139,10 @@ const FluxFeatureServerBrowser = (() => {
         footer.appendChild(sid);
 
         if (server.region) {
-            const rn = FluxConstants.SERVER_REGIONS[server.region]?.name || server.region;
+            const label = server.region.city || server.region.country || 'Unknown';
             const rb = FluxDOM.el('span', { className: 'ff-tag ff-tag-purple', style: 'margin-left:4px' });
-            rb.textContent = rn;
+            rb.textContent = label;
+            rb.title = (server.region.city ? server.region.city + ', ' : '') + server.region.country;
             footer.appendChild(rb);
         }
 
@@ -3169,18 +3158,23 @@ const FluxFeatureServerBrowser = (() => {
     }
 
     /* ====== Region Filter ====== */
-    function applyRegionFilter(regionCode) {
-        FluxStorage.set('serverregionfilter', regionCode);
-        if (!regionCode) {
+    function applyRegionFilter(filterText) {
+        FluxStorage.set('serverregionfilter', filterText);
+        if (!filterText) {
             renderServerCards(allServers);
             FluxNotifications.show('All regions: ' + allServers.length + ' servers', 'info', 2000);
             return;
         }
 
-        const filtered = allServers.filter(s => s.region === regionCode);
+        const lower = filterText.toLowerCase();
+        const filtered = allServers.filter(s => {
+            if (!s.region) return false;
+            const city = (s.region.city || '').toLowerCase();
+            const country = (s.region.country || '').toLowerCase();
+            return city.includes(lower) || country.includes(lower);
+        });
         renderServerCards(filtered);
-        const name = FluxConstants.SERVER_REGIONS[regionCode]?.name || regionCode;
-        FluxNotifications.show(name + ': ' + filtered.length + ' servers', 'info', 3000);
+        FluxNotifications.show(filterText + ': ' + filtered.length + ' servers', 'info', 3000);
     }
 
     /* ====== Controls ====== */
@@ -3210,9 +3204,20 @@ const FluxFeatureServerBrowser = (() => {
 
     function openFilterPanel() {
         FluxModals.custom((modal, close) => {
-            const regionBtns = '<button class="ff-btn ff-btn-sm ff-region-btn ff-active" data-region="">All Regions</button>' +
-                Object.entries(FluxConstants.SERVER_REGIONS).map(([k, r]) =>
-                    '<button class="ff-btn ff-btn-sm ff-region-btn" data-region="' + k + '">' + r.name + '</button>').join('');
+            // Build unique region labels from scanned servers
+            const regionSet = new Set();
+            allServers.forEach(s => {
+                if (s.region) {
+                    const label = s.region.city || s.region.country;
+                    if (label) regionSet.add(label);
+                }
+            });
+            const regionLabels = ['All Regions', ...Array.from(regionSet).sort()];
+
+            const regionOptions = regionLabels.map((name, i) => {
+                const active = i === 0 ? ' ff-active' : '';
+                return '<div class="ff-region-chip' + active + '" data-filter="' + (i === 0 ? '' : name) + '">' + name + '</div>';
+            }).join('');
 
             modal.innerHTML =
                 '<div style="padding:24px"><h3 style="margin:0 0 12px;font-size:16px">' + FluxIcons.get('filter', { size: 16 }) + ' Filters</h3>' +
@@ -3221,31 +3226,73 @@ const FluxFeatureServerBrowser = (() => {
                 '<label class="ff-checkbox-wrapper"><input type="checkbox" id="ff-f-empty"><span class="ff-checkbox-custom"></span><span>Hide Empty Servers</span></label>' +
                 '<div><label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Min Players</label>' +
                 '<input type="number" class="ff-input" id="ff-f-min" min="1" max="100" value="1" style="width:80px"></div>' +
-                '<div><label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Region</label>' +
-                '<div style="display:flex;flex-wrap:wrap;gap:4px" id="ff-region-list">' + regionBtns + '</div></div>' +
+                '<div><label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">City / Region</label>' +
+                '<input type="text" class="ff-input" id="ff-region-search" placeholder="Type city or country..." style="margin-bottom:8px">' +
+                '<div style="display:flex;flex-wrap:wrap;gap:4px;max-height:160px;overflow-y:auto" id="ff-region-list">' + regionOptions + '</div></div>' +
                 '<button class="ff-btn ff-btn-primary" id="ff-apply">Apply</button></div></div>';
 
-            modal.querySelectorAll('.ff-region-btn').forEach(btn => {
-                btn.addEventListener('click', function () {
-                    modal.querySelectorAll('.ff-region-btn').forEach(b => b.classList.remove('ff-active'));
+            const searchInput = modal.querySelector('#ff-region-search');
+            const regionList = modal.querySelector('#ff-region-list');
+
+            // Search filter for region chips
+            searchInput.addEventListener('input', function () {
+                const q = this.value.toLowerCase();
+                regionList.querySelectorAll('.ff-region-chip').forEach(chip => {
+                    chip.style.display = !q || chip.textContent.toLowerCase().includes(q) ? '' : 'none';
+                });
+            });
+
+            // Chip click handler
+            regionList.querySelectorAll('.ff-region-chip').forEach(chip => {
+                chip.addEventListener('click', function () {
+                    regionList.querySelectorAll('.ff-region-chip').forEach(c => c.classList.remove('ff-active'));
                     this.classList.add('ff-active');
                 });
             });
+
             const savedRegion = FluxStorage.get('serverregionfilter');
             if (savedRegion) {
-                const ab = modal.querySelector('.ff-region-btn[data-region="' + savedRegion + '"]');
-                if (ab) { modal.querySelectorAll('.ff-region-btn').forEach(b => b.classList.remove('ff-active')); ab.classList.add('ff-active'); }
+                const match = regionList.querySelector('.ff-region-chip[data-filter="' + savedRegion + '"]');
+                if (match) { regionList.querySelectorAll('.ff-region-chip').forEach(c => c.classList.remove('ff-active')); match.classList.add('ff-active'); }
+            }
+
+            // Auto-detect nearest region
+            const autoDetectBtn = FluxDOM.el('button', { className: 'ff-btn ff-btn-sm', style: 'margin-left:auto' });
+            autoDetectBtn.innerHTML = FluxIcons.get('map-pin', { size: 14 }) + ' Nearest';
+            autoDetectBtn.addEventListener('click', async () => {
+                autoDetectBtn.disabled = true;
+                autoDetectBtn.textContent = 'Detecting...';
+                try {
+                    const geo = await FluxGeolocationAPI.lookupIP(null);
+                    // This won't work without an IP — actually we need to detect user IP first
+                    // Use ip-api.com self-lookup
+                    const selfData = await FluxHttpClient.get('https://ip-api.com/json', { fields: 'city,country,countryCode' }, { cache: false });
+                    if (selfData && selfData.city) {
+                        searchInput.value = selfData.city;
+                        searchInput.dispatchEvent(new Event('input'));
+                        FluxNotifications.show('Nearest city: ' + selfData.city, 'info', 3000);
+                    } else {
+                        FluxNotifications.show('Could not detect location', 'warning', 3000);
+                    }
+                } catch (e) {
+                    FluxNotifications.show('Detection failed', 'warning', 3000);
+                }
+                autoDetectBtn.disabled = false;
+                autoDetectBtn.innerHTML = FluxIcons.get('map-pin', { size: 14 }) + ' Nearest';
+            });
+
+            // Insert auto-detect button above region list (inside the region label div)
+            const regionLabel = modal.querySelector('label[style*="City"]');
+            if (regionLabel && regionLabel.parentNode) {
+                const headerRow = FluxDOM.el('div', { style: 'display:flex;align-items:center;gap:8px' });
+                headerRow.appendChild(regionLabel.cloneNode(true));
+                headerRow.appendChild(autoDetectBtn);
+                regionLabel.replaceWith(headerRow);
             }
 
             modal.querySelector('#ff-apply').addEventListener('click', async () => {
-                const regionCode = modal.querySelector('.ff-region-btn.ff-active')?.dataset?.region || '';
-
-                if (regionCode && !regionScanDone) {
-                    FluxNotifications.show('Scanning servers (this may take a moment)...', 'info', 5000);
-                    await scanAndCacheRegions();
-                }
-
-                applyRegionFilter(regionCode);
+                const filterText = regionList.querySelector('.ff-region-chip.ff-active')?.dataset?.filter || '';
+                applyRegionFilter(filterText);
                 close();
             });
         }, { width: '460px' });
@@ -3835,4 +3882,4 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 22, JS lines: 3735
+// Total modules: 22, JS lines: 3784

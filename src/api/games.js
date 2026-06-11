@@ -142,7 +142,7 @@ const FluxGamesAPI = (() => {
                 const epIp = ep?.Address || ep?.address || null;
                 if (epIp && epIp !== '0.0.0.0' && !epIp.startsWith('10.') && !epIp.startsWith('127.') && !epIp.startsWith('192.168.')) {
                     const geo = await FluxGeolocationAPI.getRegionFromIP(epIp);
-                    if (geo.region) return geo.region;
+                    if (geo.region) return { city: geo.region.city, country: geo.region.country, countryCode: geo.region.countryCode };
                 }
             }
 
@@ -152,17 +152,11 @@ const FluxGamesAPI = (() => {
                 const cIp = c?.Address || c?.address || null;
                 if (cIp && cIp !== '0.0.0.0' && !cIp.startsWith('10.') && !cIp.startsWith('127.') && !cIp.startsWith('192.168.')) {
                     const geo = await FluxGeolocationAPI.getRegionFromIP(cIp);
-                    if (geo.region) return geo.region;
+                    if (geo.region) return { city: geo.region.city, country: geo.region.country, countryCode: geo.region.countryCode };
                 }
             }
 
-            // Attempt 3: DataCenterId fallback mapping
-            const dcId = String(js?.DataCenterId || data?.DataCenterId || '');
-            if (dcId && FluxConstants.DATACENTER_REGION_MAP[dcId]) {
-                return FluxConstants.DATACENTER_REGION_MAP[dcId];
-            }
-
-            FluxLogger.info('Region lookup: no usable IP/DC data for ' + serverId);
+            FluxLogger.info('Region lookup: no usable IP for ' + serverId);
         } catch (e) {
             FluxLogger.info('Region lookup error for ' + serverId + ': ' + e.message);
         }

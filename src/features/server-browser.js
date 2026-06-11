@@ -207,9 +207,10 @@ const FluxFeatureServerBrowser = (() => {
         footer.appendChild(sid);
 
         if (server.region) {
-            const rn = FluxConstants.SERVER_REGIONS[server.region]?.name || server.region;
+            const label = server.region.city || server.region.country || 'Unknown';
             const rb = FluxDOM.el('span', { className: 'ff-tag ff-tag-purple', style: 'margin-left:4px' });
-            rb.textContent = rn;
+            rb.textContent = label;
+            rb.title = (server.region.city ? server.region.city + ', ' : '') + server.region.country;
             footer.appendChild(rb);
         }
 
@@ -225,18 +226,23 @@ const FluxFeatureServerBrowser = (() => {
     }
 
     /* ====== Region Filter ====== */
-    function applyRegionFilter(regionCode) {
-        FluxStorage.set('serverregionfilter', regionCode);
-        if (!regionCode) {
+    function applyRegionFilter(filterText) {
+        FluxStorage.set('serverregionfilter', filterText);
+        if (!filterText) {
             renderServerCards(allServers);
             FluxNotifications.show('All regions: ' + allServers.length + ' servers', 'info', 2000);
             return;
         }
 
-        const filtered = allServers.filter(s => s.region === regionCode);
+        const lower = filterText.toLowerCase();
+        const filtered = allServers.filter(s => {
+            if (!s.region) return false;
+            const city = (s.region.city || '').toLowerCase();
+            const country = (s.region.country || '').toLowerCase();
+            return city.includes(lower) || country.includes(lower);
+        });
         renderServerCards(filtered);
-        const name = FluxConstants.SERVER_REGIONS[regionCode]?.name || regionCode;
-        FluxNotifications.show(name + ': ' + filtered.length + ' servers', 'info', 3000);
+        FluxNotifications.show(filterText + ': ' + filtered.length + ' servers', 'info', 3000);
     }
 
     /* ====== Controls ====== */
@@ -266,9 +272,20 @@ const FluxFeatureServerBrowser = (() => {
 
     function openFilterPanel() {
         FluxModals.custom((modal, close) => {
-            const regionBtns = '<button class="ff-btn ff-btn-sm ff-region-btn ff-active" data-region="">All Regions</button>' +
-                Object.entries(FluxConstants.SERVER_REGIONS).map(([k, r]) =>
-                    '<button class="ff-btn ff-btn-sm ff-region-btn" data-region="' + k + '">' + r.name + '</button>').join('');
+            // Build unique region labels from scanned servers
+            const regionSet = new Set();
+            allServers.forEach(s => {
+                if (s.region) {
+                    const label = s.region.city || s.region.country;
+                    if (label) regionSet.add(label);
+                }
+            });
+            const regionLabels = ['All Regions', ...Array.from(regionSet).sort()];
+
+            const regionOptions = regionLabels.map((name, i) => {
+                const active = i === 0 ? ' ff-active' : '';
+                return '<div class="ff-region-chip' + active + '" data-filter="' + (i === 0 ? '' : name) + '">' + name + '</div>';
+            }).join('');
 
             modal.innerHTML =
                 '<div style="padding:24px"><h3 style="margin:0 0 12px;font-size:16px">' + FluxIcons.get('filter', { size: 16 }) + ' Filters</h3>' +
@@ -277,31 +294,73 @@ const FluxFeatureServerBrowser = (() => {
                 '<label class="ff-checkbox-wrapper"><input type="checkbox" id="ff-f-empty"><span class="ff-checkbox-custom"></span><span>Hide Empty Servers</span></label>' +
                 '<div><label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Min Players</label>' +
                 '<input type="number" class="ff-input" id="ff-f-min" min="1" max="100" value="1" style="width:80px"></div>' +
-                '<div><label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Region</label>' +
-                '<div style="display:flex;flex-wrap:wrap;gap:4px" id="ff-region-list">' + regionBtns + '</div></div>' +
+                '<div><label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">City / Region</label>' +
+                '<input type="text" class="ff-input" id="ff-region-search" placeholder="Type city or country..." style="margin-bottom:8px">' +
+                '<div style="display:flex;flex-wrap:wrap;gap:4px;max-height:160px;overflow-y:auto" id="ff-region-list">' + regionOptions + '</div></div>' +
                 '<button class="ff-btn ff-btn-primary" id="ff-apply">Apply</button></div></div>';
 
-            modal.querySelectorAll('.ff-region-btn').forEach(btn => {
-                btn.addEventListener('click', function () {
-                    modal.querySelectorAll('.ff-region-btn').forEach(b => b.classList.remove('ff-active'));
+            const searchInput = modal.querySelector('#ff-region-search');
+            const regionList = modal.querySelector('#ff-region-list');
+
+            // Search filter for region chips
+            searchInput.addEventListener('input', function () {
+                const q = this.value.toLowerCase();
+                regionList.querySelectorAll('.ff-region-chip').forEach(chip => {
+                    chip.style.display = !q || chip.textContent.toLowerCase().includes(q) ? '' : 'none';
+                });
+            });
+
+            // Chip click handler
+            regionList.querySelectorAll('.ff-region-chip').forEach(chip => {
+                chip.addEventListener('click', function () {
+                    regionList.querySelectorAll('.ff-region-chip').forEach(c => c.classList.remove('ff-active'));
                     this.classList.add('ff-active');
                 });
             });
+
             const savedRegion = FluxStorage.get('serverregionfilter');
             if (savedRegion) {
-                const ab = modal.querySelector('.ff-region-btn[data-region="' + savedRegion + '"]');
-                if (ab) { modal.querySelectorAll('.ff-region-btn').forEach(b => b.classList.remove('ff-active')); ab.classList.add('ff-active'); }
+                const match = regionList.querySelector('.ff-region-chip[data-filter="' + savedRegion + '"]');
+                if (match) { regionList.querySelectorAll('.ff-region-chip').forEach(c => c.classList.remove('ff-active')); match.classList.add('ff-active'); }
+            }
+
+            // Auto-detect nearest region
+            const autoDetectBtn = FluxDOM.el('button', { className: 'ff-btn ff-btn-sm', style: 'margin-left:auto' });
+            autoDetectBtn.innerHTML = FluxIcons.get('map-pin', { size: 14 }) + ' Nearest';
+            autoDetectBtn.addEventListener('click', async () => {
+                autoDetectBtn.disabled = true;
+                autoDetectBtn.textContent = 'Detecting...';
+                try {
+                    const geo = await FluxGeolocationAPI.lookupIP(null);
+                    // This won't work without an IP — actually we need to detect user IP first
+                    // Use ip-api.com self-lookup
+                    const selfData = await FluxHttpClient.get('https://ip-api.com/json', { fields: 'city,country,countryCode' }, { cache: false });
+                    if (selfData && selfData.city) {
+                        searchInput.value = selfData.city;
+                        searchInput.dispatchEvent(new Event('input'));
+                        FluxNotifications.show('Nearest city: ' + selfData.city, 'info', 3000);
+                    } else {
+                        FluxNotifications.show('Could not detect location', 'warning', 3000);
+                    }
+                } catch (e) {
+                    FluxNotifications.show('Detection failed', 'warning', 3000);
+                }
+                autoDetectBtn.disabled = false;
+                autoDetectBtn.innerHTML = FluxIcons.get('map-pin', { size: 14 }) + ' Nearest';
+            });
+
+            // Insert auto-detect button above region list (inside the region label div)
+            const regionLabel = modal.querySelector('label[style*="City"]');
+            if (regionLabel && regionLabel.parentNode) {
+                const headerRow = FluxDOM.el('div', { style: 'display:flex;align-items:center;gap:8px' });
+                headerRow.appendChild(regionLabel.cloneNode(true));
+                headerRow.appendChild(autoDetectBtn);
+                regionLabel.replaceWith(headerRow);
             }
 
             modal.querySelector('#ff-apply').addEventListener('click', async () => {
-                const regionCode = modal.querySelector('.ff-region-btn.ff-active')?.dataset?.region || '';
-
-                if (regionCode && !regionScanDone) {
-                    FluxNotifications.show('Scanning servers (this may take a moment)...', 'info', 5000);
-                    await scanAndCacheRegions();
-                }
-
-                applyRegionFilter(regionCode);
+                const filterText = regionList.querySelector('.ff-region-chip.ff-active')?.dataset?.filter || '';
+                applyRegionFilter(filterText);
                 close();
             });
         }, { width: '460px' });
