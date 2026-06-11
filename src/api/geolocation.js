@@ -64,7 +64,7 @@ const FluxGeolocationAPI = (() => {
         TN: 'eu-west-1', ET: 'eu-west-1', TZ: 'eu-west-1',
     };
 
-    /** Look up IP location with caching (uses GM_xmlhttpRequest to bypass CORS) */
+    /** Look up IP location using local database (no HTTP call, instant) */
     async function lookupIP(ip) {
         if (!ip || ip === '0.0.0.0') return null;
 
@@ -75,26 +75,26 @@ const FluxGeolocationAPI = (() => {
         }
 
         try {
-            // Use FluxHttpClient which uses GM_xmlhttpRequest (CORS-free)
-            const data = await FluxHttpClient.get(
-                `${GEO_API}/${ip}`,
-                { fields: 'countryCode,country,city,regionName' },
-                { cache: false, retries: 1 }
-            );
-            if (data && data.countryCode) {
-                const region = COUNTRY_TO_REGION[data.countryCode] || null;
+            const parts = ip.split('.');
+            if (parts.length !== 4) return null;
+
+            // Try /16 prefix lookup in local database
+            const prefix16 = parts[0] + '.' + parts[1];
+            const countryCode = IP_REGION_DB[prefix16] || null;
+            if (countryCode) {
+                const region = COUNTRY_TO_REGION[countryCode] || null;
                 const result = {
-                    countryCode: data.countryCode,
-                    country: data.country,
-                    city: data.city,
-                    regionName: data.regionName,
+                    countryCode: countryCode,
+                    country: null,
+                    city: null,
+                    regionName: null,
                     fluxRegion: region
                 };
                 CACHE.set(ip, { data: result, t: Date.now() });
                 return result;
             }
         } catch (e) {
-            FluxLogger.info('IP geolocation failed for ' + ip + ': ' + e.message);
+            FluxLogger.info('IP local lookup failed for ' + ip + ': ' + e.message);
         }
         return null;
     }
