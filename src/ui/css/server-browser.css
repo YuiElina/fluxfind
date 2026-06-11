@@ -14,14 +14,34 @@
     border-radius: 12px !important;
     overflow: hidden;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    min-height: 180px;
 }
 .card-item-public-server:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0,0,0,0.25);
 }
-.player-thumbnails-container {
-    padding: 8px 8px 4px 8px;
-}
 .rbx-public-game-server-details {
     padding: 4px 10px 10px 10px;
+    flex: 1;
+}
+
+/* Override Roblox flex layout with 3-column grid for thumbnail consistency */
+.player-thumbnails-container {
+    padding: 8px 8px 4px 8px;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+    justify-items: center;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
+    align-self: center;
+    min-height: 60px;
+    -ms-flex-wrap: unset;
+    -ms-flex-pack: unset;
+    -ms-flex-item-align: unset;
+    flex-wrap: unset;
+    justify-content: unset;
 }

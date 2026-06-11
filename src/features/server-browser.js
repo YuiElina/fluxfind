@@ -11,6 +11,7 @@ const FluxFeatureServerBrowser = (() => {
 
     let loaded = false, serverObserver = null, _rendering = false;
     let allServers = [];
+    let displayedServers = [];
     let regionScanDone = false;
     let currentGameId = 0;
 
@@ -111,6 +112,7 @@ const FluxFeatureServerBrowser = (() => {
 
     /* ====== Card Rendering ====== */
     function renderServerCards(servers) {
+        displayedServers = servers;
         const container = document.querySelector('#rbx-public-game-server-item-container');
         if (!container) return;
 
@@ -404,7 +406,8 @@ const FluxFeatureServerBrowser = (() => {
             if (!regionScanDone) return;
             serverObserver.disconnect();
             serverObserver = null;
-            renderServerCards(allServers);
+            // Re-render current displayed list (preserves sort order)
+            renderServerCards(displayedServers);
             observeServerList();
         }, 400));
         serverObserver.observe(c, { childList: true, subtree: false });
