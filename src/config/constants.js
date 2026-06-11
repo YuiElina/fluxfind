@@ -129,6 +129,41 @@ const FluxConstants = (() => {
         'me-west-1': { name: 'Middle East', coords: [25.2048, 55.2708] }
     };
 
+    /** Predefined region filter chips grouped by continent */
+    const REGION_CHIPS = [
+        { group: 'North America', chips: [
+            { label: 'Ashburn, VA', cc: 'US' },
+            { label: 'Atlanta, GA', cc: 'US' },
+            { label: 'Chicago, IL', cc: 'US' },
+            { label: 'Dallas, TX', cc: 'US' },
+            { label: 'Los Angeles, CA', cc: 'US' },
+            { label: 'Miami, FL', cc: 'US' },
+            { label: 'New York / New Jersey', cc: 'US' },
+            { label: 'Portland, OR', cc: 'US' },
+            { label: 'San Jose / Palo Alto', cc: 'US' },
+            { label: 'Washington D.C.', cc: 'US' }
+        ]},
+        { group: 'Europe', chips: [
+            { label: 'Amsterdam', cc: 'NL' },
+            { label: 'Frankfurt', cc: 'DE' },
+            { label: 'London', cc: 'GB' },
+            { label: 'Paris', cc: 'FR' },
+            { label: 'Warsaw', cc: 'PL' }
+        ]},
+        { group: 'Asia', chips: [
+            { label: 'Hong Kong', cc: 'HK' },
+            { label: 'Mumbai', cc: 'IN' },
+            { label: 'Singapore', cc: 'SG' },
+            { label: 'Tokyo', cc: 'JP' }
+        ]},
+        { group: 'Oceania', chips: [
+            { label: 'Sydney', cc: 'AU' }
+        ]},
+        { group: 'South America', chips: [
+            { label: 'São Paulo', cc: 'BR' }
+        ]}
+    ];
+
     /**
      * Maps Roblox DataCenterId (numeric string) to our region key.
      * Based on known Roblox datacenter IDs.
