@@ -129,11 +129,23 @@ const FluxGamesAPI = (() => {
                 { headers: { 'X-CSRF-TOKEN': csrf }, retries: 0 }
             );
 
+            // Debug: log what we got back
+            if (!data) {
+                FluxLogger.info('Region lookup: POST returned falsy data for ' + serverId.substring(0, 8));
+                return null;
+            }
+
             // Response: { joinScript: { UdmuxEndpoints: [{Address,Port}], DataCenterId, ... } }
             const js = data?.joinScript || data;
+            const hasJs = !!data?.joinScript;
 
             // Attempt 1: Geocode via server IP from UdmuxEndpoints (public IPs)
             const endpoints = js?.UdmuxEndpoints || js?.udmuxEndpoints || [];
+            FluxLogger.info(`Region debug[${serverId.substring(0,8)}]: hasJoinScript=${hasJs} endpoints=${endpoints.length} dataCenterId=${js?.DataCenterId || 'none'}`);
+            if (endpoints.length > 0) {
+                FluxLogger.info(`Region debug[${serverId.substring(0,8)}]: first endpoint Address=${endpoints[0]?.Address || 'none'}`);
+            }
+
             for (const ep of endpoints) {
                 const epIp = ep?.Address || ep?.address || null;
                 if (epIp && epIp !== '0.0.0.0' && !epIp.startsWith('10.') && !epIp.startsWith('127.') && !epIp.startsWith('192.168.')) {
