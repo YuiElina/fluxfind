@@ -71,8 +71,11 @@ const FluxFeatureServerBrowser = (() => {
             try {
                 const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(tokenSlice, false);
                 thumbs.forEach(t => {
-                    if (t.imageUrl && t.token) {
-                        thumbnailMap.set(String(t.token), t.imageUrl);
+                    if (t.imageUrl && t.requestId) {
+                        const parts = t.requestId.split(':');
+                        if (parts.length >= 2) {
+                            thumbnailMap.set(parts[1], t.imageUrl);
+                        }
                     }
                 });
                 FluxLogger.info('Got ' + thumbnailMap.size + ' thumbnails');
@@ -143,43 +146,57 @@ const FluxFeatureServerBrowser = (() => {
         // Player thumbnails
         const thumbsContainer = FluxDOM.el('div', { className: 'player-thumbnails-container' });
 
+        // Smart 6-slot thumbnail rendering: real avatars + user-round-plus placeholders
+        const maxSlots = 6;
+        const isFull = server.playing >= server.maxPlayers;
+        const totalTokens = server.playerTokens.length;
+
         if (server.thumbnails.length === 0) {
-            // No thumbnails at all -- show player count badge centered, span full grid width
+            // No thumbnails at all -- show player count badge centered, span full width
             const countDiv = FluxDOM.el('div', {
-                style: 'display:flex;align-items:center;justify-content:center;min-height:56px;padding:8px;grid-column:1/-1'
+                style: 'display:flex;align-items:center;justify-content:center;min-height:56px;padding:8px;flex-basis:100%'
             });
             const badge = FluxDOM.el('span', { className: 'ff-badge', style: 'font-size:13px;padding:6px 14px' });
             badge.innerHTML = FluxIcons.get('users', { size: 14, color: '#fff' }) + ' ' + server.playing + ' / ' + server.maxPlayers;
             countDiv.appendChild(badge);
             thumbsContainer.appendChild(countDiv);
         } else {
-            // Always render 5 avatar slots for consistent card height
-            const maxAvatars = 5;
-            for (let i = 0; i < maxAvatars; i++) {
+            const thumbsToShow = server.thumbnails.slice(0, maxSlots);
+            for (let i = 0; i < maxSlots; i++) {
                 const avatar = FluxDOM.el('span', { className: 'avatar avatar-headshot-md player-avatar' });
                 const imgContainer = FluxDOM.el('span', { className: 'thumbnail-2d-container avatar-card-image' });
-                if (i < server.thumbnails.length) {
-                    const img = FluxDOM.el('img', { src: server.thumbnails[i], alt: '', title: '' });
+
+                if (i < thumbsToShow.length) {
+                    // Real thumbnail
+                    const img = FluxDOM.el('img', { src: thumbsToShow[i], alt: '', title: '' });
                     img.addEventListener('error', function () {
                         this.style.display = 'none';
                     });
                     imgContainer.appendChild(img);
+                } else if (!isFull && i < totalTokens) {
+                    // Slot has a player but no thumbnail — ghost user icon
+                    avatar.classList.add('avatar-ghost');
+                    imgContainer.innerHTML = FluxIcons.get('user', { size: 24, color: 'currentColor' });
+                } else if (!isFull) {
+                    // Open slot — user-round-plus to indicate space available
+                    avatar.classList.add('avatar-ghost');
+                    imgContainer.innerHTML = FluxIcons.get('userRoundPlus', { size: 24, color: 'currentColor' });
                 }
+                // If server is full and we've exhausted thumbs, render nothing (empty avatar)
+
                 avatar.appendChild(imgContainer);
                 thumbsContainer.appendChild(avatar);
             }
         }
 
-        // "+N" overlay badge on the last avatar when there are more than 5 players
-        const totalTokens = server.playerTokens.length;
-        if (totalTokens > 5) {
+        // "+N" overlay badge on the last avatar when total players exceed maxSlots
+        if (totalTokens > maxSlots) {
             const children = thumbsContainer.children;
-            if (children.length > 0) {
-                const lastAvatar = children[Math.min(children.length - 1, 4)];
-                // Ensure position:relative for absolute badge anchoring
+            if (children.length > 0 && children.length >= maxSlots) {
+                const lastAvatar = children[maxSlots - 1];
                 lastAvatar.style.position = 'relative';
                 const badge = FluxDOM.el('span', { className: 'ff-overflow-badge' });
-                badge.textContent = '+' + (totalTokens - 5);
+                badge.textContent = '+' + (totalTokens - maxSlots);
                 lastAvatar.appendChild(badge);
             }
         }
@@ -203,7 +220,7 @@ const FluxFeatureServerBrowser = (() => {
         });
         joinBtn.addEventListener('click', () => {
             FluxNotifications.show('Joining server...', 'info', 2000);
-            FluxGamesAPI.joinServer(currentGameId, server.id).catch(() => {});
+            window.location.href = 'roblox://placeId=' + currentGameId + '&gameInstanceId=' + server.id;
         });
         joinBtn.textContent = 'Join';
         joinSpan.appendChild(joinBtn);
