@@ -56,7 +56,7 @@ const FluxFeatureServerBrowser = (() => {
         const ids = servers.map(s => s.id).slice(0, 30);
         const regionMap = await FluxGamesAPI.fetchServerRegions(currentGameId, ids);
 
-        // Step 3: Collect all player tokens and batch-fetch thumbnails (first 100 tokens)
+        // Step 3: Collect all unique player tokens and batch-fetch thumbnails in 100-token chunks
         const allTokens = [];
         const tokenSet = new Set();
         servers.forEach(s => {
@@ -65,23 +65,29 @@ const FluxFeatureServerBrowser = (() => {
         });
 
         const thumbnailMap = new Map();
-        const tokenSlice = allTokens.slice(0, 100);
-        if (tokenSlice.length > 0) {
-            FluxLogger.info('Fetching thumbnails for ' + tokenSlice.length + ' unique players...');
-            try {
-                const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(tokenSlice, false);
-                thumbs.forEach(t => {
-                    if (t.imageUrl && t.requestId) {
-                        const parts = t.requestId.split(':');
-                        if (parts.length >= 2) {
-                            thumbnailMap.set(parts[1], t.imageUrl);
+        if (allTokens.length > 0) {
+            const chunks = FluxUtils.chunk(allTokens, 100);
+            FluxLogger.info('Fetching thumbnails for ' + allTokens.length + ' unique players in ' + chunks.length + ' batch(es)...');
+            for (let i = 0; i < chunks.length; i++) {
+                try {
+                    const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(chunks[i], false);
+                    thumbs.forEach(t => {
+                        if (t.imageUrl && t.requestId) {
+                            const parts = t.requestId.split(':');
+                            if (parts.length >= 2) {
+                                thumbnailMap.set(parts[1], t.imageUrl);
+                            }
                         }
-                    }
-                });
-                FluxLogger.info('Got ' + thumbnailMap.size + ' thumbnails');
-            } catch (e) {
-                FluxLogger.info('Thumbnail fetch failed: ' + e.message);
+                    });
+                } catch (e) {
+                    FluxLogger.info('Thumbnail batch ' + (i + 1) + ' failed: ' + e.message);
+                }
+                // Small delay between batches to avoid rate limiting
+                if (i < chunks.length - 1) {
+                    await new Promise(r => setTimeout(r, 300));
+                }
             }
+            FluxLogger.info('Got ' + thumbnailMap.size + ' thumbnails total');
         }
 
         // Step 4: Build server list

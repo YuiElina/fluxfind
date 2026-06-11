@@ -29,7 +29,7 @@
 
 /* Flexbox layout with centered wrapping for consistent thumbnail rows */
 .player-thumbnails-container {
-    padding: 10px 8px 4px 8px;
+    padding: 8px 4px 4px 4px;
     display: flex !important;
     flex-wrap: wrap;
     justify-content: center;
@@ -44,4 +44,11 @@
 /* Ghost avatar slot (placeholder for unfilled server) */
 .player-thumbnails-container .avatar-ghost {
     opacity: 0.35;
+}
+
+/* Center SVG icons inside ghost avatar slots */
+.avatar-ghost .thumbnail-2d-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
