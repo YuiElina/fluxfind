@@ -14,7 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const VERSION = '1.0.0';
+const VERSION = '0.1.0-alpha';
 
 // CSS files to compile (order matters — variables must come first)
 const CSS_FILES = [

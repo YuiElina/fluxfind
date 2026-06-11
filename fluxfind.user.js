@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FluxFind
 // @namespace    https://github.com/YuiElina/fluxfind/
-// @version      1.0.0
+// @version      0.1.0-alpha
 // @description  Enhanced Roblox server browser with filtering, region detection, smart search, and quality-of-life improvements. Free and open source alternative to paid extensions.
 // @author       YuiElina
 // @match        https://www.roblox.com/*
