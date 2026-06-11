@@ -3049,10 +3049,14 @@ const FluxFeatureServerBrowser = (() => {
         const container = document.querySelector('#rbx-public-game-server-item-container');
         if (!container) return;
 
+        // Guard against re-entrancy from MutationObserver firing during our own DOM writes
+        _rendering = true;
+
         container.innerHTML = '';
 
         if (!servers.length) {
             container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ff-text-muted)">No servers match this filter</div>';
+            _rendering = false;
             return;
         }
 
@@ -3062,6 +3066,7 @@ const FluxFeatureServerBrowser = (() => {
         });
         container.appendChild(fragment);
 
+        _rendering = false;
         FluxLogger.info('Rendered ' + servers.length + ' server cards');
     }
 
@@ -3076,9 +3081,9 @@ const FluxFeatureServerBrowser = (() => {
         const thumbsContainer = FluxDOM.el('div', { className: 'player-thumbnails-container' });
 
         if (server.thumbnails.length === 0) {
-            // No thumbnails at all -- show player count badge centered
+            // No thumbnails at all -- show player count badge centered, span full grid width
             const countDiv = FluxDOM.el('div', {
-                style: 'display:flex;align-items:center;justify-content:center;min-height:56px;padding:8px'
+                style: 'display:flex;align-items:center;justify-content:center;min-height:56px;padding:8px;grid-column:1/-1'
             });
             const badge = FluxDOM.el('span', { className: 'ff-badge', style: 'font-size:13px;padding:6px 14px' });
             badge.innerHTML = FluxIcons.get('users', { size: 14, color: '#fff' }) + ' ' + server.playing + ' / ' + server.maxPlayers;
@@ -3341,6 +3346,8 @@ const FluxFeatureServerBrowser = (() => {
         const c = document.querySelector(FluxConstants.SELECTORS.SERVER_LIST);
         if (!c || serverObserver) return;
         serverObserver = new MutationObserver(FluxUtils.debounce(() => {
+            // Skip mutations caused by our own render (prevents infinite recursion)
+            if (_rendering) return;
             // Only fire after scan is fully done
             if (!regionScanDone) return;
             serverObserver.disconnect();
@@ -3910,5 +3917,5 @@ if (document.readyState === 'loading') {
 
 // ====== FLUXFIND INITIALIZATION COMPLETE ======
 // Auto-initialization is handled by FluxApp module
-// Total modules: 22, JS lines: 3810
+// Total modules: 22, JS lines: 3817
 })();
