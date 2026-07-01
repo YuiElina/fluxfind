@@ -18,7 +18,7 @@ export const FluxThumbnailsAPI = ((): {
     const tokens = playerTokens.slice(0, 100);
     const body = tokens.map(token => ({
       requestId: `0:${token}:AvatarHeadshot:150x150:png:regular`,
-      type: 'AvatarHeadshot' as const,
+      type: 'AvatarHeadShot' as const,
       targetId: 0,
       token,
       format: 'png',

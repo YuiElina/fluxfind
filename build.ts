@@ -72,12 +72,38 @@ const LICENSE = `/**
 
 `;
 
+function loadCSSFiles(): string {
+  const cssDir = path.resolve(__dirname, 'src', 'ui', 'css');
+  const files = [
+    'variables.css',
+    'components.css',
+    'modals.css',
+    'server-browser.css',
+    'settings.css',
+  ];
+
+  let combined = '';
+  for (const file of files) {
+    const filePath = path.join(cssDir, file);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      combined += content + '\n';
+    }
+  }
+
+  return combined;
+}
+
 async function build(): Promise<void> {
   console.log(`\n  FluxFind Build System v${VERSION} (TypeScript + esbuild)`);
   console.log('  ' + '='.repeat(50));
 
   const srcEntry = path.resolve(__dirname, 'src', 'app.ts');
   const outPath = path.resolve(__dirname, 'dist', 'fluxfind.user.js');
+
+  // Load CSS files at build time
+  const cssContent = loadCSSFiles();
+  console.log(`  CSS loaded: ${String(cssContent.length)} chars from src/ui/css/`);
 
   // Step 1: Bundle with esbuild
   console.log('  [1/2] Bundling TypeScript...');
@@ -110,18 +136,32 @@ async function build(): Promise<void> {
     ],
   });
 
-
   if (result.errors.length > 0) {
     console.error('  BUILD FAILED:');
     for (const err of result.errors) console.error('    ' + err.text);
     process.exit(1);
   }
 
-  // Step 2: Prepend userscript header + license
+  // Step 2: Prepend userscript header + license, inject CSS
   console.log('  [2/2] Assembling userscript output...');
 
   const bundlePath = path.resolve(__dirname, 'dist', 'temp-bundle.js');
   let bundleContent = fs.readFileSync(bundlePath, 'utf-8');
+
+  // Inject CSS from source files via GM_addStyle before the main IIFE
+  const escapedCSS = cssContent
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$');
+
+  const cssInjection = `GM_addStyle(\`${escapedCSS}\`);\n`;
+
+  // Insert CSS injection right after the license, before esbuild's IIFE
+  // esbuild outputs: "use strict";\n(() => {\n...
+  const strictMarker = '"use strict";';
+  if (bundleContent.includes(strictMarker)) {
+    bundleContent = bundleContent.replace(strictMarker, strictMarker + '\n' + cssInjection);
+  }
 
   const output = HEADER + LICENSE + bundleContent.trim() + '\n';
 
