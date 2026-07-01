@@ -105,8 +105,8 @@ export const FluxGamesAPI = ((): {
 
       const retryIds: string[] = [];
       for (const s of settled) {
-        if (s.status === 'fulfilled' && s.value !== undefined) {
-          const val = s.value as { sid: string; result: RegionResult | null };
+        if (s.status === 'fulfilled') {
+          const val = s.value;
           if (val.result !== null) {
             results.set(val.sid, val.result);
             success++;
@@ -124,8 +124,8 @@ export const FluxGamesAPI = ((): {
         await new Promise(r => setTimeout(r, 500));
         const retrySettled = await Promise.allSettled(retryIds.map(sid => fetchSingleRegion(gameId, sid)));
         for (const s of retrySettled) {
-          if (s.status === 'fulfilled' && s.value !== undefined) {
-            const val = s.value as { sid: string; result: RegionResult | null };
+          if (s.status === 'fulfilled') {
+            const val = s.value;
             if (val.result !== null) {
               results.set(val.sid, val.result);
               success++;
