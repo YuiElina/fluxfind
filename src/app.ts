@@ -81,9 +81,12 @@ export const FluxApp = ((): { init: () => void } => {
       .card-item-public-server { border-radius: 12px !important; overflow: hidden; transition: transform 0.15s ease, box-shadow 0.15s ease; display: flex; flex-direction: column; min-height: 200px; }
       .card-item-public-server:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
       .rbx-public-game-server-details { padding: 4px 10px 10px 10px; flex: 1; }
-      .player-thumbnails-container { padding: 8px 4px 4px 4px; display: flex !important; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; width: 100%; max-width: 100%; align-self: center; min-height: 60px; }
+      .player-thumbnails-container { padding: 8px 4px 4px 4px; display: flex !important; flex-wrap: wrap; justify-content: center !important; align-items: center; gap: 4px; width: 100%; max-width: 100%; align-self: center; min-height: 60px; }
       .player-thumbnails-container .avatar-ghost { opacity: 0.35; }
       .avatar-ghost .thumbnail-2d-container { display: flex; align-items: center; justify-content: center; }
+      #rbx-public-game-server-item-container { display: flex; flex-wrap: wrap; }
+      .stack .card-list .card-item .player-thumbnails-container { -ms-flex-wrap: wrap; flex-wrap: wrap; -ms-flex-pack: start; justify-content: center !important; -ms-flex-item-align: center; align-self: center; gap: 6px; max-width: 192px; display: -ms-flexbox; display: flex; }
+      .card-item.card-item-friends-server { border-radius: 12px; }
       #ff-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: none; flex-direction: column; justify-content: center; align-items: center; gap: 16px; }
       .ff-modal-overlay-active { display: flex !important; }
       @keyframes ff-popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
