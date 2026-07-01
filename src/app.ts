@@ -18,7 +18,7 @@ export const FluxApp = ((): { init: () => void } => {
     initialized = true;
 
     FluxLogger.init();
-    FluxLogger.info('FluxFind v' + FluxConstants.VERSION + ' initializing...');
+    FluxLogger.info('App', 'FluxFind v' + FluxConstants.VERSION + ' initializing...');
 
     FluxStorage.migrateLegacy();
     FluxStorage.initDefaults(FluxConstants.DEFAULT_SETTINGS);
@@ -29,15 +29,18 @@ export const FluxApp = ((): { init: () => void } => {
     injectSettingsButton();
 
     FluxRouter.start((newPage: PageHandler) => {
+      FluxLogger.info('App', `Page navigation: ${newPage}`);
       if (newPage === 'servers' || newPage === 'game') {
-        FluxFeatureServerBrowser.init().catch(() => { /* ignore */ });
+        FluxFeatureServerBrowser.init().catch(e => {
+          FluxLogger.warn('App', `ServerBrowser init failed: ${String(e)}`);
+        });
       }
     });
 
     FluxFeatureAdRemover.start();
     scheduleServerBrowser();
 
-    FluxLogger.info('FluxFind initialized');
+    FluxLogger.info('App', 'FluxFind initialized successfully');
   }
 
   function injectCoreStyles(): void {

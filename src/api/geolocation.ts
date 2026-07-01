@@ -19,6 +19,7 @@ export const FluxGeolocationAPI = ((): {
 
     const cached = CACHE.get(ip);
     if (cached !== undefined && (Date.now() - cached.t) < CACHE_TTL) {
+      FluxLogger.debug('Geolocation', `Cache hit for ${ip}: ${cached.data.city ?? cached.data.country}`);
       return cached.data;
     }
 
@@ -32,10 +33,12 @@ export const FluxGeolocationAPI = ((): {
           regionName: typeof data.regionName === 'string' ? data.regionName : null,
         };
         CACHE.set(ip, { data: result, t: Date.now() });
+        FluxLogger.debug('Geolocation', `Resolved ${ip} → ${result.city ?? result.country} (${result.countryCode})`);
         return result;
       }
+      FluxLogger.warn('Geolocation', `No countryCode in response for ${ip}`);
     } catch (e) {
-      FluxLogger.info('IP geolocation failed for ' + ip + ': ' + String(e));
+      FluxLogger.warn('Geolocation', `Lookup failed for ${ip}: ${String(e)}`);
     }
     return null;
   }
@@ -43,14 +46,15 @@ export const FluxGeolocationAPI = ((): {
   async function getRegionFromIP(ip: string): Promise<{ region: GeoData | null; details?: GeoData | null }> {
     const geo = await lookupIP(ip);
     if (geo !== null) {
-      FluxLogger.info(`IP ${ip} → ${geo.city ?? geo.country} (${geo.countryCode})`);
       return { region: geo };
     }
     return { region: null, details: geo };
   }
 
   function clearCache(): void {
+    const size = CACHE.size;
     CACHE.clear();
+    FluxLogger.debug('Geolocation', `Cache cleared (${String(size)} entries)`);
   }
 
   return { lookupIP, getRegionFromIP, clearCache };

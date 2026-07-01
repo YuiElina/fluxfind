@@ -6,7 +6,7 @@
  * Usage: npx tsx build.ts
  * Output: fluxfind.user.js
  *
- * @license GPL-2.0-only
+ * @license AOL-1.0
  */
 
 import * as esbuild from 'esbuild';
@@ -24,7 +24,7 @@ const HEADER = `// ==UserScript==
 // @description  Enhanced Roblox server browser with filtering, region detection, smart search, and quality-of-life improvements. Free and open source alternative to paid extensions.
 // @author       YuiElina
 // @match        https://www.roblox.com/*
-// @license      GPL-2.0-only
+// @license      AOL-1.0
 // @icon         https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/search.svg
 // @supportURL   https://github.com/YuiElina/fluxfind
 // @downloadURL  https://raw.githubusercontent.com/YuiElina/fluxfind/main/fluxfind.user.js
@@ -52,19 +52,22 @@ const HEADER = `// ==UserScript==
 
 const LICENSE = `/**
  * FluxFind - Enhanced Roblox Server Browser & Utility Suite
- * Copyright (C) 2026  FluxFind Contributors
+ * Copyright (c) 2026 FluxFind Contributors
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Licensed under the Authentic Open License, Version 1.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ *     https://github.com/YuiElina/AOL-LICENSE/blob/master/LICENSE
  *
- * Source: https://github.com/YuiElina/fluxfind
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * @license AOL-1.0
+ * @see https://github.com/YuiElina/AOL-LICENSE
  */
 
 `;
@@ -148,7 +151,7 @@ async function build(): Promise<void> {
   console.log('  Build complete!');
   console.log('  Output:  fluxfind.user.js');
   console.log('  Size:    ' + sizeKB + ' KB');
-  console.log('  License: GPL-2.0-only\n');
+  console.log('  License: AOL-1.0\n');
 }
 
 build().catch(err => {

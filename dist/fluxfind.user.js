@@ -5,7 +5,7 @@
 // @description  Enhanced Roblox server browser with filtering, region detection, smart search, and quality-of-life improvements. Free and open source alternative to paid extensions.
 // @author       YuiElina
 // @match        https://www.roblox.com/*
-// @license      GPL-2.0-only
+// @license      AOL-1.0
 // @icon         https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/search.svg
 // @supportURL   https://github.com/YuiElina/fluxfind
 // @downloadURL  https://raw.githubusercontent.com/YuiElina/fluxfind/main/fluxfind.user.js
@@ -31,19 +31,22 @@
 
 /**
  * FluxFind - Enhanced Roblox Server Browser & Utility Suite
- * Copyright (C) 2026  FluxFind Contributors
+ * Copyright (c) 2026 FluxFind Contributors
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Licensed under the Authentic Open License, Version 1.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ *     https://github.com/YuiElina/AOL-LICENSE/blob/master/LICENSE
  *
- * Source: https://github.com/YuiElina/fluxfind
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * @license AOL-1.0
+ * @see https://github.com/YuiElina/AOL-LICENSE
  */
 
 (function() {
@@ -56,8 +59,13 @@
   var __defProp = Object.defineProperty;
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
-  var __esm = (fn, res) => function __init() {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  var __esm = (fn, res, err) => function __init() {
+    if (err) throw err[0];
+    try {
+      return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+    } catch (e) {
+      throw err = [e], e;
+    }
   };
   var __export = (target, all) => {
     for (var name in all)
@@ -65,11 +73,13 @@
   };
 
   // src/core/logger.ts
-  var FluxLogger;
+  var timers, FluxLogger;
   var init_logger = __esm({
     "src/core/logger.ts"() {
       "use strict";
-      FluxLogger = /* @__PURE__ */ (() => {
+      timers = /* @__PURE__ */ new Map();
+      FluxLogger = (() => {
+        "use strict";
         let enabled = false;
         let level = "INFO";
         const LEVEL_PRIORITY = {
@@ -84,35 +94,76 @@
           WARN: "color: #FF9800; font-weight: bold",
           ERROR: "color: #F44336; font-weight: bold"
         };
+        const CONSOLE_METHOD = {
+          DEBUG: "debug",
+          INFO: "info",
+          WARN: "warn",
+          ERROR: "error"
+        };
         function prefix() {
-          const ts = (/* @__PURE__ */ new Date()).toISOString().slice(11, 23);
-          return `[FLUXFIND] [${ts}]`;
+          const now = /* @__PURE__ */ new Date();
+          const hh = String(now.getHours()).padStart(2, "0");
+          const mm = String(now.getMinutes()).padStart(2, "0");
+          const ss = String(now.getSeconds()).padStart(2, "0");
+          const ms = String(now.getMilliseconds()).padStart(3, "0");
+          return `[FLUXFIND] [${hh}:${mm}:${ss}.${ms}]`;
         }
         __name(prefix, "prefix");
         function shouldLog(threshold) {
           return enabled && LEVEL_PRIORITY[threshold] >= LEVEL_PRIORITY[level];
         }
         __name(shouldLog, "shouldLog");
-        function debug(msg, ...args) {
-          if (!shouldLog("DEBUG")) return;
-          console.debug("%c" + prefix() + " " + msg, STYLES.DEBUG, ...args);
+        function log(threshold, mod, msg, ...args) {
+          if (!shouldLog(threshold)) return;
+          const fullPrefix = `${prefix()} [${mod}]`;
+          const method = CONSOLE_METHOD[threshold];
+          const style = STYLES[threshold];
+          if (args.length > 0) {
+            console[method](`%c${fullPrefix} ${msg}`, style, ...args);
+          } else {
+            console[method](`%c${fullPrefix} ${msg}`, style);
+          }
+        }
+        __name(log, "log");
+        function debug(mod, msg, ...args) {
+          log("DEBUG", mod, msg, ...args);
         }
         __name(debug, "debug");
-        function info(msg, ...args) {
-          if (!shouldLog("INFO")) return;
-          console.info("%c" + prefix() + " " + msg, STYLES.INFO, ...args);
+        function info(mod, msg, ...args) {
+          log("INFO", mod, msg, ...args);
         }
         __name(info, "info");
-        function warn(msg, ...args) {
-          if (!shouldLog("WARN")) return;
-          console.warn("%c" + prefix() + " " + msg, STYLES.WARN, ...args);
+        function warn(mod, msg, ...args) {
+          log("WARN", mod, msg, ...args);
         }
         __name(warn, "warn");
-        function error(msg, ...args) {
-          if (!shouldLog("ERROR")) return;
-          console.error("%c" + prefix() + " " + msg, STYLES.ERROR, ...args);
+        function error(mod, msg, ...args) {
+          log("ERROR", mod, msg, ...args);
         }
         __name(error, "error");
+        function timeStart(label) {
+          timers.set(label, performance.now());
+        }
+        __name(timeStart, "timeStart");
+        function timeEnd(label, mod = "General") {
+          const start = timers.get(label);
+          timers.delete(label);
+          if (start === void 0) return 0;
+          const elapsed = Math.round((performance.now() - start) * 100) / 100;
+          log("DEBUG", mod, `\u23F1 ${label}: ${String(elapsed)}ms`);
+          return elapsed;
+        }
+        __name(timeEnd, "timeEnd");
+        function group(mod, label) {
+          if (!enabled) return;
+          console.group(`%c${prefix()} [${mod}] ${label}`, "color: #9C27B0; font-weight: bold");
+        }
+        __name(group, "group");
+        function groupEnd() {
+          if (!enabled) return;
+          console.groupEnd();
+        }
+        __name(groupEnd, "groupEnd");
         function init() {
           try {
             enabled = typeof GM_getValue !== "undefined" ? String(GM_getValue("FLUXFIND_enableLogs", "false")) === "true" : localStorage.getItem("FLUXFIND_enableLogs") === "true";
@@ -124,7 +175,7 @@
           }
         }
         __name(init, "init");
-        return { init, debug, info, warn, error };
+        return { init, debug, info, warn, error, timeStart, timeEnd, group, groupEnd };
       })();
     }
   });
@@ -607,6 +658,7 @@
           if (ip === "" || ip === "0.0.0.0") return null;
           const cached = CACHE.get(ip);
           if (cached !== void 0 && Date.now() - cached.t < CACHE_TTL) {
+            FluxLogger.debug("Geolocation", `Cache hit for ${ip}: ${cached.data.city ?? cached.data.country}`);
             return cached.data;
           }
           try {
@@ -619,10 +671,12 @@
                 regionName: typeof data.regionName === "string" ? data.regionName : null
               };
               CACHE.set(ip, { data: result, t: Date.now() });
+              FluxLogger.debug("Geolocation", `Resolved ${ip} \u2192 ${result.city ?? result.country} (${result.countryCode})`);
               return result;
             }
+            FluxLogger.warn("Geolocation", `No countryCode in response for ${ip}`);
           } catch (e) {
-            FluxLogger.info("IP geolocation failed for " + ip + ": " + String(e));
+            FluxLogger.warn("Geolocation", `Lookup failed for ${ip}: ${String(e)}`);
           }
           return null;
         }
@@ -630,14 +684,15 @@
         async function getRegionFromIP(ip) {
           const geo = await lookupIP(ip);
           if (geo !== null) {
-            FluxLogger.info(`IP ${ip} \u2192 ${geo.city ?? geo.country} (${geo.countryCode})`);
             return { region: geo };
           }
           return { region: null, details: geo };
         }
         __name(getRegionFromIP, "getRegionFromIP");
         function clearCache() {
+          const size = CACHE.size;
           CACHE.clear();
+          FluxLogger.debug("Geolocation", `Cache cleared (${String(size)} entries)`);
         }
         __name(clearCache, "clearCache");
         return { lookupIP, getRegionFromIP, clearCache };
@@ -1030,7 +1085,7 @@
         if (currentPath !== lastPath) {
           lastPath = currentPath;
           const newPage = detectPage();
-          FluxLogger.info(`Route changed: -> ${newPage} (${currentPath})`);
+          FluxLogger.info("Router", `Route changed: -> ${newPage} (${currentPath})`);
           callback(newPage, null);
         }
       }, FluxConstants.TIMING.URL_CHECK_INTERVAL);
@@ -1111,24 +1166,7 @@
   })();
 
   // src/ui/settings-panel.ts
-  var FluxSettingsPanel = /* @__PURE__ */ (() => {
-    function open() {
-      FluxModals.custom((modal, close) => {
-        modal.innerHTML = '<div style="padding:24px"><h3 style="margin:0 0 16px;font-size:18px;display:flex;align-items:center;gap:8px">' + FluxIcons.get("settings", { size: 20 }) + ' FluxFind Settings</h3><div style="display:flex;flex-direction:column;gap:12px">' + toggleRow("togglefilterserversbutton", "Server Filters", "Show filter controls on game server pages") + toggleRow("autoserverregions", "Auto Region Scan", "Automatically fetch server locations") + toggleRow("removeads", "Remove Ads", "Remove promotional content from pages") + toggleRow("responsivegamecards", "Responsive Cards", "Make game cards adapt to screen width") + toggleRow("forcedarkmode", "Dark Mode", "Override page theme to dark") + toggleRow("smartsearch", "Smart Search", "Enhanced search suggestions") + toggleRow("disablechat", "Disable Chat", "Remove the chat sidebar") + toggleRow("enableLogs", "Debug Logs", "Show FluxFind logs in console") + '</div><div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="ff-btn ff-btn-primary" id="ff-close-settings">Close</button></div></div>';
-        const closeBtn = modal.querySelector("#ff-close-settings");
-        if (closeBtn) closeBtn.addEventListener("click", () => {
-          close();
-        });
-      });
-    }
-    __name(open, "open");
-    function toggleRow(key, label, desc) {
-      const checked = FluxStorage.getBool(key, false);
-      return '<label class="ff-toggle-wrapper"><input type="checkbox" class="ff-toggle-input" data-key="' + key + '"' + (checked ? " checked" : "") + '><span class="ff-toggle-track"><span class="ff-toggle-knob"></span></span><span class="ff-toggle-label">' + label + '<br><small style="color:#888">' + desc + "</small></span></label>";
-    }
-    __name(toggleRow, "toggleRow");
-    return { open };
-  })();
+  init_logger();
 
   // src/features/ad-remover.ts
   init_utils();
@@ -1136,6 +1174,7 @@
   var FluxFeatureAdRemover = (() => {
     let observer = null;
     let enabled = false;
+    let blockedSession = 0;
     const AD_SELECTORS = [
       '[data-testid="home-page-game-grid"] > div:last-child',
       ".game-promotion-section",
@@ -1147,31 +1186,52 @@
       "#game-grid-sponsored"
     ];
     const selector = AD_SELECTORS.join(",");
+    function getTotalBlocked() {
+      return FluxStorage.getNumber("adBlockedTotal", 0);
+    }
+    __name(getTotalBlocked, "getTotalBlocked");
+    function incrementTotal(count) {
+      const current = getTotalBlocked();
+      FluxStorage.set("adBlockedTotal", current + count);
+    }
+    __name(incrementTotal, "incrementTotal");
     function removeAds() {
       if (!enabled) return;
       const ads = document.querySelectorAll(selector);
       let removed = 0;
       for (const ad of ads) {
-        ad.remove();
+        const el = ad;
+        const prevDisplay = el.style.display;
+        el.remove();
         removed++;
+        FluxLogger.debug("AdRemover", `Removed ad element: ${el.tagName}.${el.className.split(" ")[0] ?? "?"} (was ${prevDisplay || "visible"})`);
       }
-      if (removed > 0) FluxLogger.debug(`Removed ${String(removed)} ad elements`);
+      if (removed > 0) {
+        blockedSession += removed;
+        incrementTotal(removed);
+        FluxLogger.info("AdRemover", `Blocked ${String(removed)} ads (session: ${String(blockedSession)}, total: ${String(getTotalBlocked())})`);
+      }
     }
     __name(removeAds, "removeAds");
     const debouncedRemove = FluxUtils.debounce(removeAds, 300, true);
     function start() {
       if (enabled) return;
-      FluxLogger.info("Ad remover started");
+      FluxLogger.info("AdRemover", "Starting ad blocker...");
       enabled = true;
+      blockedSession = 0;
+      const total = getTotalBlocked();
+      FluxLogger.info("AdRemover", `Loaded stats: ${String(total)} ads blocked total (lifetime)`);
       removeAds();
       observer = new MutationObserver(() => {
         debouncedRemove();
       });
       observer.observe(document.body, { childList: true, subtree: true });
+      FluxLogger.info("AdRemover", "Ad blocker active \u2014 observing DOM mutations");
     }
     __name(start, "start");
     function stop() {
       if (!enabled) return;
+      FluxLogger.info("AdRemover", `Stopping ad blocker (session blocked: ${String(blockedSession)})`);
       enabled = false;
       if (observer !== null) {
         observer.disconnect();
@@ -1179,7 +1239,115 @@
       }
     }
     __name(stop, "stop");
-    return { start, stop, removeAds };
+    function getStats() {
+      return {
+        blockedSession,
+        blockedTotal: getTotalBlocked()
+      };
+    }
+    __name(getStats, "getStats");
+    function resetStats() {
+      FluxLogger.info("AdRemover", "Resetting ad block stats");
+      blockedSession = 0;
+      FluxStorage.set("adBlockedTotal", 0);
+    }
+    __name(resetStats, "resetStats");
+    return { start, stop, removeAds, getStats, resetStats };
+  })();
+
+  // src/ui/settings-panel.ts
+  var FluxSettingsPanel = /* @__PURE__ */ (() => {
+    function open() {
+      FluxLogger.info("Settings", "Opening settings panel");
+      const stats = FluxFeatureAdRemover.getStats();
+      FluxModals.custom((modal, close) => {
+        modal.innerHTML = '<div style="padding:24px"><h3 style="margin:0 0 16px;font-size:18px;display:flex;align-items:center;gap:8px">' + FluxIcons.get("settings", { size: 20 }) + ' FluxFind Settings</h3><div style="display:flex;flex-direction:column;gap:12px">' + toggleRow("togglefilterserversbutton", "Server Filters", "Show filter controls on game server pages") + toggleRow("autoserverregions", "Auto Region Scan", "Automatically fetch server locations") + toggleRow("removeads", "Remove Ads", "Remove promotional content from pages") + toggleRow("responsivegamecards", "Responsive Cards", "Make game cards adapt to screen width") + toggleRow("forcedarkmode", "Dark Mode", "Override page theme to dark") + toggleRow("smartsearch", "Smart Search", "Enhanced search suggestions") + toggleRow("disablechat", "Disable Chat", "Remove the chat sidebar") + toggleRow("enableLogs", "Debug Logs", "Show FluxFind logs in console") + '</div><div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--ff-border)"><h4 style="margin:0 0 10px;font-size:14px">' + FluxIcons.get("barChart", { size: 14 }) + ' Statistics</h4><div style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ff-text-secondary)"><div style="display:flex;justify-content:space-between"><span>Ads blocked this session:</span><strong>' + String(stats.blockedSession) + '</strong></div><div style="display:flex;justify-content:space-between"><span>Ads blocked (total):</span><strong>' + String(stats.blockedTotal) + '</strong></div></div><button id="ff-reset-stats" class="ff-btn ff-btn-sm ff-btn-danger" style="margin-top:8px;width:100%">' + FluxIcons.get("trash", { size: 14 }) + ' Reset Stats</button></div><div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="ff-btn ff-btn-primary" id="ff-close-settings">Close</button></div></div>';
+        const closeBtn = modal.querySelector("#ff-close-settings");
+        if (closeBtn) closeBtn.addEventListener("click", () => {
+          FluxLogger.debug("Settings", "Settings panel closed");
+          close();
+        });
+        const resetBtn = modal.querySelector("#ff-reset-stats");
+        if (resetBtn) resetBtn.addEventListener("click", () => {
+          FluxFeatureAdRemover.resetStats();
+          FluxLogger.info("Settings", "Ad block stats reset");
+          const updatedStats = FluxFeatureAdRemover.getStats();
+          const sessionEl = modal.querySelector(".ff-stats-session");
+          const totalEl = modal.querySelector(".ff-stats-total");
+          if (sessionEl) sessionEl.textContent = String(updatedStats.blockedSession);
+          if (totalEl) totalEl.textContent = String(updatedStats.blockedTotal);
+        });
+        modal.querySelectorAll(".ff-toggle-input").forEach((input) => {
+          input.addEventListener("change", function() {
+            const key = this.dataset.key;
+            if (!key) return;
+            const checked = this.checked;
+            FluxStorage.setBool(key, checked);
+            FluxLogger.info("Settings", `Toggle changed: ${key} = ${String(checked)}`);
+            applySettingChange(key, checked);
+          });
+        });
+        const statsRows = modal.querySelectorAll(".ff-stats-session, .ff-stats-total");
+        if (statsRows.length === 0) {
+          const strongEls = modal.querySelectorAll('[style*="justify-content:space-between"] strong');
+          if (strongEls[0]) strongEls[0].classList.add("ff-stats-session");
+          if (strongEls[1]) strongEls[1].classList.add("ff-stats-total");
+        }
+      });
+    }
+    __name(open, "open");
+    function applySettingChange(key, value) {
+      switch (key) {
+        case "forcedarkmode": {
+          if (value) {
+            document.documentElement.classList.add("ff-dark-mode");
+            document.body.style.setProperty("background-color", "var(--ff-bg-primary)", "important");
+            FluxLogger.debug("Settings", "Dark mode applied to body");
+          } else {
+            document.documentElement.classList.remove("ff-dark-mode");
+            document.body.style.removeProperty("background-color");
+            FluxLogger.debug("Settings", "Dark mode removed from body");
+          }
+          break;
+        }
+        case "disablechat": {
+          const chatContainer = document.querySelector('#chat-container, .chat-main, [class*="chat"]');
+          if (chatContainer instanceof HTMLElement) {
+            chatContainer.style.display = value ? "none" : "";
+            FluxLogger.debug("Settings", `Chat sidebar: ${value ? "hidden" : "shown"}`);
+          } else {
+            FluxLogger.warn("Settings", "Chat container not found \u2014 cannot toggle visibility in real-time");
+          }
+          break;
+        }
+        case "removeads": {
+          if (value) {
+            FluxFeatureAdRemover.start();
+          } else {
+            FluxFeatureAdRemover.stop();
+          }
+          break;
+        }
+        case "enableLogs": {
+          FluxLogger.info("Settings", `Log setting changed to ${String(value)} \u2014 re-initializing logger`);
+          FluxLogger.init();
+          if (value) {
+            FluxLogger.info("Settings", "Debug logging is now enabled");
+          }
+          break;
+        }
+        default:
+          FluxLogger.debug("Settings", `Setting "${key}" changed to ${String(value)} \u2014 no real-time handler needed`);
+          break;
+      }
+    }
+    __name(applySettingChange, "applySettingChange");
+    function toggleRow(key, label, desc) {
+      const checked = FluxStorage.getBool(key, false);
+      return '<label class="ff-toggle-wrapper"><input type="checkbox" class="ff-toggle-input" data-key="' + key + '"' + (checked ? " checked" : "") + '><span class="ff-toggle-track"><span class="ff-toggle-knob"></span></span><span class="ff-toggle-label">' + label + '<br><small style="color:#888">' + desc + "</small></span></label>";
+    }
+    __name(toggleRow, "toggleRow");
+    return { open };
   })();
 
   // src/features/server-browser.ts
@@ -1285,6 +1453,7 @@
       let allData = [];
       let cursor = null;
       let page = 0;
+      FluxLogger.info("GamesAPI", `Fetching servers for game ${String(gameId)} (max: ${String(maxServers)})`);
       do {
         const url = `${FluxConstants.API.GAMES_API}/games/${String(gameId)}/servers/Public?sortOrder=${sortOrder}&limit=100${cursor ? "&cursor=" + encodeURIComponent(cursor) : ""}`;
         const resp = await FluxHttpClient.get(url, {}, { cache: false });
@@ -1292,52 +1461,101 @@
         allData = allData.concat(servers);
         cursor = resp.nextPageCursor ?? null;
         page++;
-        FluxLogger.info(`Fetched page ${String(page)}: ${String(servers.length)} servers (total: ${String(allData.length)})`);
+        FluxLogger.debug("GamesAPI", `Page ${String(page)}: ${String(servers.length)} servers (total: ${String(allData.length)}, cursor: ${cursor ? "yes" : "none"})`);
       } while (cursor !== null && allData.length < maxServers && page < 10);
+      FluxLogger.info("GamesAPI", `Server fetch complete: ${String(allData.length)} servers across ${String(page)} page(s)`);
       return allData;
     }
     __name(fetchAllPublicServers, "fetchAllPublicServers");
+    async function fetchSingleRegion(gameId, sid) {
+      try {
+        const data = await FluxHttpClient.post(
+          `${FluxConstants.API.JOIN_API}/join-game-instance`,
+          { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: sid },
+          { headers: { "User-Agent": "Roblox/WinInet" }, retries: 0 }
+        );
+        const js = data.joinScript && typeof data.joinScript === "object" ? data.joinScript : data;
+        if (Object.keys(js).length === 0) {
+          FluxLogger.warn("GamesAPI", `Region [${sid}]: empty joinScript response`);
+          return { sid, result: null };
+        }
+        const endpoints = js.UdmuxEndpoints ?? js.udmuxEndpoints;
+        if (endpoints === void 0 || endpoints.length === 0) {
+          FluxLogger.warn("GamesAPI", `Region [${sid}]: no UdmuxEndpoints in response`);
+          return { sid, result: null };
+        }
+        for (const ep of endpoints) {
+          const epIp = ep.Address ?? null;
+          if (epIp !== null && epIp !== "0.0.0.0" && !epIp.startsWith("10.") && !epIp.startsWith("127.") && !epIp.startsWith("192.168.")) {
+            const geo = await Promise.resolve().then(() => (init_geolocation(), geolocation_exports)).then((m) => m.FluxGeolocationAPI.getRegionFromIP(epIp));
+            if (geo.region !== null && typeof geo.region === "object") {
+              const r = geo.region;
+              FluxLogger.info("GamesAPI", `Region [${sid}]: ${r.city ?? r.country} (${r.countryCode}) via ${epIp}`);
+              return { sid, result: r };
+            }
+          }
+        }
+        FluxLogger.warn("GamesAPI", `Region [${sid}]: no valid public IP found in endpoints`);
+        return { sid, result: null };
+      } catch (e) {
+        FluxLogger.warn("GamesAPI", `Region [${sid}]: lookup exception \u2014 ${String(e)}`);
+        return { sid, result: null };
+      }
+    }
+    __name(fetchSingleRegion, "fetchSingleRegion");
     async function fetchServerRegions(gameId, serverIds) {
       if (serverIds.length === 0) return /* @__PURE__ */ new Map();
       const results = /* @__PURE__ */ new Map();
-      let success = 0, failed = 0;
-      for (let i = 0; i < serverIds.length; i++) {
-        if (i > 0) await new Promise((r) => setTimeout(r, 250));
-        const sid = serverIds[i];
-        if (sid === void 0) continue;
-        try {
-          const data = await FluxHttpClient.post(
-            `${FluxConstants.API.JOIN_API}/join-game-instance`,
-            { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: sid },
-            { headers: { "User-Agent": "Roblox/WinInet" }, retries: 0 }
-          );
-          const js = data.joinScript && typeof data.joinScript === "object" ? data.joinScript : data;
-          if (Object.keys(js).length === 0) {
+      let success = 0;
+      let failed = 0;
+      const CHUNK_SIZE = 5;
+      FluxLogger.info("GamesAPI", `Region scan: ${String(serverIds.length)} servers in chunks of ${String(CHUNK_SIZE)}`);
+      FluxLogger.timeStart("region-scan");
+      const chunks = [];
+      for (let i = 0; i < serverIds.length; i += CHUNK_SIZE) {
+        chunks.push(serverIds.slice(i, i + CHUNK_SIZE));
+      }
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const chunk = chunks[ci];
+        if (chunk === void 0) continue;
+        if (ci > 0) await new Promise((r) => setTimeout(r, 250));
+        const settled = await Promise.allSettled(chunk.map((sid) => fetchSingleRegion(gameId, sid)));
+        const retryIds = [];
+        for (const s of settled) {
+          if (s.status === "fulfilled" && s.value !== void 0) {
+            const val = s.value;
+            if (val.result !== null) {
+              results.set(val.sid, val.result);
+              success++;
+            } else {
+              retryIds.push(val.sid);
+            }
+          } else {
             failed++;
-            continue;
           }
-          const endpoints = js.UdmuxEndpoints ?? js.udmuxEndpoints;
-          if (endpoints !== void 0 && endpoints.length > 0) {
-            for (const ep of endpoints) {
-              const epIp = ep.Address ?? null;
-              if (epIp !== null && epIp !== "0.0.0.0" && !epIp.startsWith("10.") && !epIp.startsWith("127.") && !epIp.startsWith("192.168.")) {
-                const geo = await Promise.resolve().then(() => (init_geolocation(), geolocation_exports)).then((m) => m.FluxGeolocationAPI.getRegionFromIP(epIp));
-                if (geo.region !== null && typeof geo.region === "object") {
-                  const r = geo.region;
-                  results.set(sid, { city: r.city, country: r.country, countryCode: r.countryCode });
-                  success++;
-                  break;
-                }
+        }
+        if (retryIds.length > 0) {
+          FluxLogger.debug("GamesAPI", `Retrying ${String(retryIds.length)} failed region lookups`);
+          await new Promise((r) => setTimeout(r, 500));
+          const retrySettled = await Promise.allSettled(retryIds.map((sid) => fetchSingleRegion(gameId, sid)));
+          for (const s of retrySettled) {
+            if (s.status === "fulfilled" && s.value !== void 0) {
+              const val = s.value;
+              if (val.result !== null) {
+                results.set(val.sid, val.result);
+                success++;
+              } else {
+                failed++;
               }
+            } else {
+              failed++;
             }
           }
-          if (!results.has(sid)) failed++;
-        } catch (e) {
-          FluxLogger.info("Region lookup error: " + String(e));
-          failed++;
         }
+        FluxLogger.debug("GamesAPI", `Chunk ${String(ci + 1)}/${String(chunks.length)}: ${String(success)} found, ${String(failed)} failed so far`);
       }
-      FluxLogger.info(`Regions: ${String(success)} found, ${String(failed)} failed (${String(serverIds.length)} total)`);
+      const elapsed = FluxLogger.timeEnd("region-scan", "GamesAPI");
+      FluxLogger.info("GamesAPI", `Region scan complete: ${String(success)}/${String(serverIds.length)} resolved, ${String(failed)} failed (${String(elapsed)}ms)`);
       return results;
     }
     __name(fetchServerRegions, "fetchServerRegions");
@@ -1444,46 +1662,70 @@
       const tokens = playerTokens.slice(0, 100);
       const body = tokens.map((token) => ({
         requestId: `0:${token}:AvatarHeadshot:150x150:png:regular`,
-        type: "AvatarHeadShot",
+        type: "AvatarHeadshot",
         targetId: 0,
         token,
         format: "png",
         size: "150x150"
       }));
+      FluxLogger.debug("Thumbnails", `Batch request: ${String(tokens.length)} tokens`);
       try {
         const data = await FluxHttpClient.post(`${THUMBNAILS_API}/batch`, body, { cache: false, retries: 2 });
         const rawData = data?.data ?? [];
         const results = Array.isArray(rawData) ? rawData : Object.values(rawData);
-        FluxLogger.info(`Thumbnails batch: ${String(results.length)} results parsed`);
-        return results;
+        const typed = results;
+        const successCount = typed.filter((r) => r.imageUrl !== null && r.imageUrl !== void 0).length;
+        const failCount = typed.length - successCount;
+        FluxLogger.info("Thumbnails", `Batch result: ${String(successCount)} thumbnails resolved, ${String(failCount)} failed (${String(typed.length)} total)`);
+        if (failCount > 0) {
+          FluxLogger.warn("Thumbnails", `${String(failCount)} thumbnails returned no imageUrl \u2014 API may have rejected some tokens`);
+        }
+        return typed;
       } catch (e) {
-        FluxLogger.info("Thumbnails batch failed: " + String(e));
+        FluxLogger.error("Thumbnails", `Batch request failed: ${String(e)}`);
         return [];
       }
     }
     __name(fetchPlayerThumbnailsByTokens, "fetchPlayerThumbnailsByTokens");
     async function fetchGroupIconsBatch(groupIds) {
       if (groupIds.length === 0) return [];
+      FluxLogger.debug("Thumbnails", `Fetching icons for ${String(groupIds.length)} groups`);
       return FluxHttpClient.get(
         `${THUMBNAILS_API}/groups/icons`,
         { groupIds: groupIds.join(","), size: "150x150", format: "Png", isCircular: "false" },
         { cache: true }
-      ).then((r) => r?.data ?? []).catch(() => []);
+      ).then((r) => {
+        const result = r?.data ?? [];
+        FluxLogger.debug("Thumbnails", `Group icons resolved: ${String(result.length)}`);
+        return result;
+      }).catch((e) => {
+        FluxLogger.warn("Thumbnails", `Group icon fetch failed: ${String(e)}`);
+        return [];
+      });
     }
     __name(fetchGroupIconsBatch, "fetchGroupIconsBatch");
     async function fetchCatalogThumbnailsBatch(assetIds) {
       if (assetIds.length === 0) return [];
+      FluxLogger.debug("Thumbnails", `Fetching catalog thumbnails for ${String(assetIds.length)} assets`);
       return FluxHttpClient.get(
         `${THUMBNAILS_API}/assets`,
         { assetIds: assetIds.join(","), size: "150x150", format: "png", isCircular: "false" },
         { cache: true }
-      ).then((r) => r?.data ?? []).catch(() => []);
+      ).then((r) => {
+        const result = r?.data ?? [];
+        FluxLogger.debug("Thumbnails", `Catalog thumbnails resolved: ${String(result.length)}`);
+        return result;
+      }).catch((e) => {
+        FluxLogger.warn("Thumbnails", `Catalog thumbnail fetch failed: ${String(e)}`);
+        return [];
+      });
     }
     __name(fetchCatalogThumbnailsBatch, "fetchCatalogThumbnailsBatch");
     return { fetchPlayerThumbnailsByTokens, fetchGroupIconsBatch, fetchCatalogThumbnailsBatch };
   })();
 
   // src/features/server-browser.ts
+  var MAX_SLOTS = 6;
   var FluxFeatureServerBrowser = /* @__PURE__ */ (() => {
     let loaded = false;
     let serverObserver = null;
@@ -1492,9 +1734,20 @@
     let displayedServers = [];
     let regionScanDone = false;
     let currentGameId = 0;
+    function getMaxServerCount() {
+      const fromStorage = FluxStorage.getNumber("serverfetchcount", 0);
+      if (fromStorage > 0) return fromStorage;
+      const defaultCount = FluxStorage.getNumber("autoserverregionnumber", 50);
+      return defaultCount > 0 ? defaultCount : 50;
+    }
+    __name(getMaxServerCount, "getMaxServerCount");
+    function getRegionScanCount() {
+      return Math.min(getMaxServerCount(), 100);
+    }
+    __name(getRegionScanCount, "getRegionScanCount");
     async function scanAndCacheRegions(force = false) {
       if (!force && regionScanDone) {
-        FluxLogger.info("Region scan: already done");
+        FluxLogger.info("ServerBrowser", "Region scan: already completed, skipping");
         return;
       }
       regionScanDone = false;
@@ -1503,27 +1756,30 @@
         serverObserver.disconnect();
         serverObserver = null;
       }
-      FluxLogger.info("Region scan: fetching server list...");
-      FluxNotifications.show("Fetching servers from Roblox API...", "info", 4e3);
+      const maxServers = getMaxServerCount();
+      FluxLogger.info("ServerBrowser", `Region scan starting (max servers: ${String(maxServers)})`);
+      FluxNotifications.show(`Fetching up to ${String(maxServers)} servers...`, "info", 4e3);
       let servers;
       try {
-        servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, "Asc", 300);
+        FluxLogger.timeStart("server-fetch");
+        servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, "Asc", maxServers);
+        FluxLogger.timeEnd("server-fetch", "ServerBrowser");
       } catch (e) {
-        FluxLogger.info(`Fetch failed: ${String(e)}`);
+        FluxLogger.error("ServerBrowser", `Server fetch failed: ${String(e)}`);
         FluxNotifications.show("Failed to fetch servers", "error", 3e3);
         observeServerList();
         return;
       }
       if (servers.length === 0) {
-        FluxLogger.info("0 servers returned");
+        FluxLogger.warn("ServerBrowser", "0 servers returned from API");
         FluxNotifications.show("No public servers found", "warning", 3e3);
         observeServerList();
         return;
       }
-      FluxLogger.info(`Region scan: got ${String(servers.length)} servers`);
-      FluxNotifications.show(`Scanning regions for ${String(servers.length)} servers...`, "info", 5e3);
-      const ids = servers.map((s) => s.id).slice(0, 30);
-      const regionMap = await FluxGamesAPI.fetchServerRegions(currentGameId, ids);
+      FluxLogger.info("ServerBrowser", `Fetched ${String(servers.length)} servers, scanning regions...`);
+      const scanCount = getRegionScanCount();
+      const idsToScan = servers.slice(0, scanCount).map((s) => s.id);
+      const regionMap = await FluxGamesAPI.fetchServerRegions(currentGameId, idsToScan);
       const allTokens = [];
       const tokenSet = /* @__PURE__ */ new Set();
       servers.forEach((s) => {
@@ -1534,48 +1790,66 @@
           }
         });
       });
+      FluxLogger.info("ServerBrowser", `Unique player tokens to resolve: ${String(allTokens.length)}`);
       const thumbnailMap = /* @__PURE__ */ new Map();
       if (allTokens.length > 0) {
         const chunks = FluxUtils.chunk(allTokens, 100);
-        FluxLogger.info(`Fetching thumbnails for ${String(allTokens.length)} players in ${String(chunks.length)} batch(es)`);
+        FluxLogger.info("ServerBrowser", `Fetching thumbnails in ${String(chunks.length)} batch(es)`);
+        FluxLogger.timeStart("thumbnail-fetch");
         for (let i = 0; i < chunks.length; i++) {
           try {
             const chunk = chunks[i];
             if (chunk === void 0) continue;
             const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(chunk, false);
+            let resolvedInChunk = 0;
             thumbs.forEach((t) => {
               if (t.imageUrl && t.requestId) {
                 const parts = t.requestId.split(":");
-                if (parts.length >= 2 && parts[1] !== void 0) thumbnailMap.set(parts[1], t.imageUrl);
+                if (parts.length >= 2 && parts[1] !== void 0) {
+                  thumbnailMap.set(parts[1], t.imageUrl);
+                  resolvedInChunk++;
+                }
               }
             });
+            FluxLogger.debug("ServerBrowser", `Thumbnail batch ${String(i + 1)}/${String(chunks.length)}: ${String(resolvedInChunk)} resolved out of ${String(chunk.length)} tokens`);
           } catch (e) {
-            FluxLogger.info(`Thumbnail batch ${String(i + 1)} failed: ${String(e)}`);
+            FluxLogger.warn("ServerBrowser", `Thumbnail batch ${String(i + 1)}/${String(chunks.length)} failed: ${String(e)}`);
           }
           if (i < chunks.length - 1) await new Promise((r) => setTimeout(r, 300));
         }
-        FluxLogger.info(`Got ${String(thumbnailMap.size)} thumbnails`);
+        FluxLogger.timeEnd("thumbnail-fetch", "ServerBrowser");
+        FluxLogger.info("ServerBrowser", `Thumbnail map built: ${String(thumbnailMap.size)}/${String(allTokens.length)} player tokens resolved`);
       }
-      allServers = servers.slice(0, 30).map((s) => ({
+      allServers = servers.slice(0, scanCount).map((s) => ({
         id: s.id,
         playing: s.playing,
         maxPlayers: s.maxPlayers,
         playerTokens: s.playerTokens,
-        thumbnails: s.playerTokens.slice(0, 5).map((t) => thumbnailMap.get(t) ?? null).filter((x) => x !== null),
+        thumbnails: s.playerTokens.slice(0, MAX_SLOTS).map((t) => thumbnailMap.get(t) ?? null).filter((x) => x !== null),
         region: regionMap.get(s.id) ?? null
       }));
+      const withRegion = allServers.filter((s) => s.region !== null).length;
+      const withoutRegion = allServers.length - withRegion;
+      FluxLogger.info("ServerBrowser", `Servers ready: ${String(allServers.length)} total (${String(withRegion)} with region, ${String(withoutRegion)} without)`);
       regionScanDone = true;
-      FluxLogger.info(`Region scan: ${String(allServers.length)} servers ready`);
       const savedRegion = FluxStorage.get("serverregionfilter");
-      if (savedRegion) applyRegionFilter(savedRegion);
-      else renderServerCards(allServers);
+      if (savedRegion) {
+        FluxLogger.info("ServerBrowser", `Applying saved region filter: "${savedRegion}"`);
+        applyRegionFilter(savedRegion);
+      } else {
+        FluxLogger.info("ServerBrowser", "No saved region filter, rendering all servers");
+        renderServerCards(allServers);
+      }
       observeServerList();
     }
     __name(scanAndCacheRegions, "scanAndCacheRegions");
     function renderServerCards(servers) {
       displayedServers = servers;
       const container = document.querySelector("#rbx-public-game-server-item-container");
-      if (!container) return;
+      if (!container) {
+        FluxLogger.warn("ServerBrowser", "Server container not found in DOM");
+        return;
+      }
       _rendering = true;
       container.innerHTML = "";
       if (servers.length === 0) {
@@ -1587,13 +1861,13 @@
       servers.forEach((s) => fragment.appendChild(createServerCard(s)));
       container.appendChild(fragment);
       _rendering = false;
+      FluxLogger.debug("ServerBrowser", `Rendered ${String(servers.length)} server cards`);
     }
     __name(renderServerCards, "renderServerCards");
     function createServerCard(server) {
       const li = FluxDOM.el("li", { className: "rbx-public-game-server-item col-md-3 col-sm-4 col-xs-6" });
       const card = FluxDOM.el("div", { className: "card-item card-item-public-server" });
       const thumbsContainer = FluxDOM.el("div", { className: "player-thumbnails-container" });
-      const maxSlots = 6;
       const isFull = server.playing >= server.maxPlayers;
       const totalTokens = server.playerTokens.length;
       if (server.thumbnails.length === 0) {
@@ -1603,8 +1877,8 @@
         countDiv.appendChild(badge);
         thumbsContainer.appendChild(countDiv);
       } else {
-        const thumbsToShow = server.thumbnails.slice(0, maxSlots);
-        for (let i = 0; i < maxSlots; i++) {
+        const thumbsToShow = server.thumbnails.slice(0, MAX_SLOTS);
+        for (let i = 0; i < MAX_SLOTS; i++) {
           const avatar = FluxDOM.el("span", { className: "avatar avatar-headshot-md player-avatar" });
           const imgContainer = FluxDOM.el("span", { className: "thumbnail-2d-container avatar-card-image" });
           if (i < thumbsToShow.length) {
@@ -1627,14 +1901,14 @@
           thumbsContainer.appendChild(avatar);
         }
       }
-      if (totalTokens > maxSlots) {
+      if (totalTokens > MAX_SLOTS) {
         const children = thumbsContainer.children;
-        if (children.length >= maxSlots) {
-          const lastAvatar = children[maxSlots - 1];
+        if (children.length >= MAX_SLOTS) {
+          const lastAvatar = children[MAX_SLOTS - 1];
           if (lastAvatar) {
             lastAvatar.style.position = "relative";
             const badge = FluxDOM.el("span", { className: "ff-overflow-badge" });
-            badge.textContent = `+${String(totalTokens - maxSlots)}`;
+            badge.textContent = `+${String(totalTokens - MAX_SLOTS)}`;
             lastAvatar.appendChild(badge);
           }
         }
@@ -1647,6 +1921,7 @@
       joinSpan.setAttribute("data-placeid", String(currentGameId));
       const joinBtn = FluxDOM.el("button", { className: "btn-full-width btn-control-xs rbx-public-game-server-join game-server-join-btn btn-primary-md btn-min-width ff-btn ff-btn-sm ff-btn-primary" });
       joinBtn.addEventListener("click", () => {
+        FluxLogger.info("ServerBrowser", `Joining server ${server.id} via protocol handler`);
         FluxNotifications.show("Joining server...", "info", 2e3);
         window.location.href = `roblox://placeId=${String(currentGameId)}&gameInstanceId=${server.id}`;
       });
@@ -1676,25 +1951,48 @@
     function applyRegionFilter(countryCode) {
       FluxStorage.set("serverregionfilter", countryCode);
       if (!countryCode) {
+        FluxLogger.info("ServerBrowser", "Region filter cleared \u2014 showing all servers unsorted");
         renderServerCards(allServers);
         return;
       }
       const targetGroup = FluxConstants.getCountryGroup(countryCode);
-      const sorted = [...allServers].sort((a, b) => {
-        const aCC = a.region?.countryCode ?? null;
-        const bCC = b.region?.countryCode ?? null;
-        const aExact = aCC === countryCode ? 0 : 1;
-        const bExact = bCC === countryCode ? 0 : 1;
-        if (aExact !== bExact) return aExact - bExact;
-        if (targetGroup && aCC && bCC) {
-          const aSame = FluxConstants.getCountryGroup(aCC) === targetGroup ? 0 : 1;
-          const bSame = FluxConstants.getCountryGroup(bCC) === targetGroup ? 0 : 1;
-          if (aSame !== bSame) return aSame - bSame;
+      FluxLogger.info("ServerBrowser", `Sorting servers by region: target="${countryCode}"${targetGroup ? ` group="${targetGroup}"` : ""}`);
+      const scored = allServers.map((s) => {
+        const aCC = s.region?.countryCode ?? null;
+        let priority;
+        if (aCC === countryCode) {
+          priority = 0;
+        } else if (targetGroup && aCC && FluxConstants.getCountryGroup(aCC) === targetGroup) {
+          priority = 1;
+        } else if (aCC) {
+          priority = 2;
+        } else {
+          priority = 3;
         }
-        return (aCC ? 0 : 1) - (bCC ? 0 : 1);
+        return { server: s, priority };
       });
+      scored.sort((a, b) => {
+        if (a.priority !== b.priority) return a.priority - b.priority;
+        return b.server.playing - a.server.playing;
+      });
+      const sorted = scored.map((s) => s.server);
+      const exact = sorted.filter((s) => s.region?.countryCode === countryCode).length;
+      const sameGroup = targetGroup ? sorted.filter((s) => s.region?.countryCode !== countryCode && s.region?.countryCode && FluxConstants.getCountryGroup(s.region.countryCode) === targetGroup).length : 0;
+      const other = sorted.filter((s) => {
+        if (!s.region?.countryCode) return false;
+        if (s.region.countryCode === countryCode) return false;
+        if (targetGroup && FluxConstants.getCountryGroup(s.region.countryCode) === targetGroup) return false;
+        return true;
+      }).length;
+      const unknown = sorted.filter((s) => s.region === null).length;
+      FluxLogger.info("ServerBrowser", `Region sort result \u2014 exact: ${String(exact)}, same-group: ${String(sameGroup)}, other: ${String(other)}, unknown: ${String(unknown)}`);
+      if (exact > 0) {
+        const first = sorted[0];
+        const firstName = first?.region?.city ?? first?.region?.country ?? "Unknown";
+        FluxLogger.info("ServerBrowser", `First result: "${firstName}" (${first?.region?.countryCode ?? "?"}) \u2014 ${exact > 0 ? "exact match present" : "no exact match"}`);
+      }
       renderServerCards(sorted);
-      FluxNotifications.show(`${countryCode}: ${String(sorted.length)} servers`, "info", 2e3);
+      FluxNotifications.show(`${countryCode}: ${String(exact)} exact, ${String(sameGroup + other + unknown)} nearby`, "info", 2500);
     }
     __name(applyRegionFilter, "applyRegionFilter");
     function injectFilterButtons() {
@@ -1717,9 +2015,11 @@
       qBtn.innerHTML = `${FluxIcons.get("zap", { size: 14 })} Quick Join`;
       FluxUtils.batchAppend(bar, [rBtn, fBtn, qBtn]);
       container.parentNode.insertBefore(bar, container);
+      FluxLogger.debug("ServerBrowser", "Filter buttons injected");
     }
     __name(injectFilterButtons, "injectFilterButtons");
     function refreshServers() {
+      FluxLogger.info("ServerBrowser", "Manual refresh triggered");
       allServers = [];
       regionScanDone = false;
       void scanAndCacheRegions();
@@ -1727,28 +2027,54 @@
     __name(refreshServers, "refreshServers");
     function openFilterPanel() {
       FluxModals.custom((modal, close) => {
+        const currentCc = FluxStorage.get("serverregionfilter") ?? "";
+        const currentCount = getMaxServerCount();
+        const countOptions = [30, 50, 100, 200, 300];
         let groupsHTML = "";
         FluxConstants.REGION_CHIPS.forEach((group) => {
           let groupChips = "";
           group.chips.forEach((chip) => {
-            groupChips += `<div class="ff-region-chip" data-cc="${chip.cc}">${chip.label}</div>`;
+            const active = chip.cc === currentCc ? " ff-active" : "";
+            groupChips += `<div class="ff-region-chip${active}" data-cc="${chip.cc}">${chip.label}</div>`;
           });
           groupsHTML += `<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#888;margin-bottom:4px;text-transform:uppercase">${group.group}</div><div style="display:flex;flex-wrap:wrap;gap:4px">${groupChips}</div></div>`;
         });
-        modal.innerHTML = `<div style="padding:24px"><h3 style="margin:0 0 12px;font-size:16px">${FluxIcons.get("filter", { size: 16 })} Filters</h3><div style="max-height:300px;overflow-y:auto;margin-top:8px"><div style="margin-bottom:10px"><div style="display:flex;flex-wrap:wrap;gap:4px"><div class="ff-region-chip ff-active" data-cc="">All Regions</div></div></div>${groupsHTML}</div><button class="ff-btn ff-btn-primary" id="ff-apply" style="margin-top:12px;width:100%">Apply</button></div>`;
+        let countHTML = '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#888;margin-bottom:4px;text-transform:uppercase">Max Servers</div><div style="display:flex;flex-wrap:wrap;gap:4px">';
+        countOptions.forEach((n) => {
+          const active = n === currentCount ? " ff-active" : "";
+          countHTML += `<div class="ff-region-chip${active}" data-count="${String(n)}">${String(n)}</div>`;
+        });
+        countHTML += "</div></div>";
+        modal.innerHTML = `<div style="padding:24px"><h3 style="margin:0 0 12px;font-size:16px">${FluxIcons.get("filter", { size: 16 })} Filters</h3><div style="max-height:400px;overflow-y:auto;margin-top:8px"><div style="margin-bottom:10px"><div style="display:flex;flex-wrap:wrap;gap:4px"><div class="ff-region-chip` + (currentCc === "" ? " ff-active" : "") + `" data-cc="">All Regions</div></div></div>${countHTML}${groupsHTML}</div><button class="ff-btn ff-btn-primary" id="ff-apply" style="margin-top:12px;width:100%">Apply</button></div>`;
+        let selectedCc = currentCc;
+        let selectedCount = currentCount;
         modal.querySelectorAll(".ff-region-chip").forEach((chip) => {
           chip.addEventListener("click", function() {
-            modal.querySelectorAll(".ff-region-chip").forEach((c) => {
-              c.classList.remove("ff-active");
-            });
-            this.classList.add("ff-active");
+            const cc = this.dataset.cc;
+            const count = this.dataset.count;
+            if (cc !== void 0) {
+              modal.querySelectorAll(".ff-region-chip[data-cc]").forEach((c) => {
+                c.classList.remove("ff-active");
+              });
+              this.classList.add("ff-active");
+              selectedCc = cc;
+            } else if (count !== void 0) {
+              modal.querySelectorAll(".ff-region-chip[data-count]").forEach((c) => {
+                c.classList.remove("ff-active");
+              });
+              this.classList.add("ff-active");
+              selectedCount = parseInt(count, 10);
+            }
           });
         });
         const applyBtn = modal.querySelector("#ff-apply");
         if (applyBtn) applyBtn.addEventListener("click", () => {
-          const active = modal.querySelector(".ff-region-chip.ff-active");
-          const cc = active instanceof HTMLElement ? active.dataset.cc ?? "" : "";
-          applyRegionFilter(cc);
+          FluxLogger.info("ServerBrowser", `Filter applied: region="${selectedCc}", maxServers=${String(selectedCount)}`);
+          if (selectedCount !== currentCount) {
+            FluxStorage.set("serverfetchcount", selectedCount);
+            FluxLogger.info("ServerBrowser", `Server fetch count updated to ${String(selectedCount)} \u2014 will take effect on next refresh`);
+          }
+          applyRegionFilter(selectedCc);
           close();
         });
       });
@@ -1757,15 +2083,18 @@
     function quickJoinRandom() {
       if (allServers.length === 0) {
         FluxNotifications.show("No servers loaded", "warning");
+        FluxLogger.warn("ServerBrowser", "Quick join failed: no servers loaded");
         return;
       }
       const visible = allServers.filter((s) => s.playing < s.maxPlayers);
       if (visible.length === 0) {
         FluxNotifications.show("No available servers", "warning");
+        FluxLogger.warn("ServerBrowser", "Quick join failed: all servers full");
         return;
       }
       const pick = visible[Math.floor(Math.random() * visible.length)];
       if (!pick) return;
+      FluxLogger.info("ServerBrowser", `Quick join: server ${pick.id} (${String(pick.playing)}/${String(pick.maxPlayers)} players)`);
       FluxNotifications.show("Joining random server...", "info", 2e3);
       window.location.href = `roblox://placeId=${String(currentGameId)}&gameInstanceId=${pick.id}`;
     }
@@ -1783,22 +2112,40 @@
         observeServerList();
       }, 400));
       serverObserver.observe(c, { childList: true, subtree: false });
+      FluxLogger.debug("ServerBrowser", "MutationObserver attached to server list");
     }
     __name(observeServerList, "observeServerList");
     async function init() {
       if (loaded) return;
-      if (!FluxStorage.getBool("togglefilterserversbutton", true)) return;
+      if (!FluxStorage.getBool("togglefilterserversbutton", true)) {
+        FluxLogger.info("ServerBrowser", "Init skipped: feature disabled in settings");
+        return;
+      }
       currentGameId = FluxGamesAPI.getCurrentGameId();
-      if (!currentGameId) return;
+      if (!currentGameId) {
+        FluxLogger.warn("ServerBrowser", "Init skipped: no game ID detected in URL");
+        return;
+      }
+      FluxLogger.info("ServerBrowser", `Initializing for game ${String(currentGameId)}`);
       const container = await FluxUtils.watchForChild('#game-instances, .tab-content, [class*="game-instances"]', "#rbx-public-game-server-item-container", 3e4).catch(() => null);
-      if (!container) return;
+      if (!container) {
+        FluxLogger.warn("ServerBrowser", "Init failed: server container not found after 30s");
+        return;
+      }
       loaded = true;
+      FluxLogger.info("ServerBrowser", "Server container found, injecting UI");
       injectFilterButtons();
       observeServerList();
-      if (FluxStorage.getBool("autoserverregions", true)) void scanAndCacheRegions();
+      if (FluxStorage.getBool("autoserverregions", true)) {
+        FluxLogger.info("ServerBrowser", "Auto region scan enabled, starting scan");
+        void scanAndCacheRegions();
+      } else {
+        FluxLogger.info("ServerBrowser", "Auto region scan disabled, waiting for manual refresh");
+      }
     }
     __name(init, "init");
     function destroy() {
+      FluxLogger.info("ServerBrowser", "Destroying");
       loaded = false;
       regionScanDone = false;
       allServers = [];
@@ -1820,20 +2167,22 @@
       if (initialized) return;
       initialized = true;
       FluxLogger.init();
-      FluxLogger.info("FluxFind v" + FluxConstants.VERSION + " initializing...");
+      FluxLogger.info("App", "FluxFind v" + FluxConstants.VERSION + " initializing...");
       FluxStorage.migrateLegacy();
       FluxStorage.initDefaults(FluxConstants.DEFAULT_SETTINGS);
       injectCoreStyles();
       injectSettingsButton();
       FluxRouter.start((newPage) => {
+        FluxLogger.info("App", `Page navigation: ${newPage}`);
         if (newPage === "servers" || newPage === "game") {
-          FluxFeatureServerBrowser.init().catch(() => {
+          FluxFeatureServerBrowser.init().catch((e) => {
+            FluxLogger.warn("App", `ServerBrowser init failed: ${String(e)}`);
           });
         }
       });
       FluxFeatureAdRemover.start();
       scheduleServerBrowser();
-      FluxLogger.info("FluxFind initialized");
+      FluxLogger.info("App", "FluxFind initialized successfully");
     }
     __name(init, "init");
     function injectCoreStyles() {
@@ -1925,6 +2274,6 @@
  * High-performance request layer with caching, retry, rate-limit handling, and batch support
  *
  * @module api/http-client
- * @license GPL-2.0-only
+ * @license AOL-1.0
  */
 })();

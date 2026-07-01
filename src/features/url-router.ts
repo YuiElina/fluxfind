@@ -32,7 +32,7 @@ export const FluxRouter = ((): {
       if (currentPath !== lastPath) {
         lastPath = currentPath;
         const newPage = detectPage();
-        FluxLogger.info(`Route changed: -> ${newPage} (${currentPath})`);
+        FluxLogger.info('Router', `Route changed: -> ${newPage} (${currentPath})`);
         callback(newPage, null);
       }
     }, FluxConstants.TIMING.URL_CHECK_INTERVAL);

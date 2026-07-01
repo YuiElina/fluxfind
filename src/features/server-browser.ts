@@ -18,6 +18,8 @@ interface ServerCard {
   region: { city: string | null; country: string; countryCode: string } | null;
 }
 
+const MAX_SLOTS = 6;
+
 export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destroy: () => void } => {
   let loaded = false;
   let serverObserver: MutationObserver | null = null;
@@ -27,70 +29,127 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
   let regionScanDone = false;
   let currentGameId = 0;
 
+  function getMaxServerCount(): number {
+    const fromStorage = FluxStorage.getNumber('serverfetchcount', 0);
+    if (fromStorage > 0) return fromStorage;
+    const defaultCount = FluxStorage.getNumber('autoserverregionnumber', 50);
+    return defaultCount > 0 ? defaultCount : 50;
+  }
+
+  function getRegionScanCount(): number {
+    return Math.min(getMaxServerCount(), 100);
+  }
+
   async function scanAndCacheRegions(force = false): Promise<void> {
-    if (!force && regionScanDone) { FluxLogger.info('Region scan: already done'); return; }
+    if (!force && regionScanDone) {
+      FluxLogger.info('ServerBrowser', 'Region scan: already completed, skipping');
+      return;
+    }
     regionScanDone = false;
     allServers = [];
 
     if (serverObserver) { serverObserver.disconnect(); serverObserver = null; }
 
-    FluxLogger.info('Region scan: fetching server list...');
-    FluxNotifications.show('Fetching servers from Roblox API...', 'info', 4000);
+    const maxServers = getMaxServerCount();
+    FluxLogger.info('ServerBrowser', `Region scan starting (max servers: ${String(maxServers)})`);
+    FluxNotifications.show(`Fetching up to ${String(maxServers)} servers...`, 'info', 4000);
 
     let servers: { id: string; maxPlayers: number; playing: number; playerTokens: string[] }[];
-    try { servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, 'Asc', 300); }
-    catch (e) { FluxLogger.info(`Fetch failed: ${String(e)}`); FluxNotifications.show('Failed to fetch servers', 'error', 3000); observeServerList(); return; }
+    try {
+      FluxLogger.timeStart('server-fetch');
+      servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, 'Asc', maxServers);
+      FluxLogger.timeEnd('server-fetch', 'ServerBrowser');
+    } catch (e) {
+      FluxLogger.error('ServerBrowser', `Server fetch failed: ${String(e)}`);
+      FluxNotifications.show('Failed to fetch servers', 'error', 3000);
+      observeServerList();
+      return;
+    }
 
-    if (servers.length === 0) { FluxLogger.info('0 servers returned'); FluxNotifications.show('No public servers found', 'warning', 3000); observeServerList(); return; }
+    if (servers.length === 0) {
+      FluxLogger.warn('ServerBrowser', '0 servers returned from API');
+      FluxNotifications.show('No public servers found', 'warning', 3000);
+      observeServerList();
+      return;
+    }
 
-    FluxLogger.info(`Region scan: got ${String(servers.length)} servers`);
-    FluxNotifications.show(`Scanning regions for ${String(servers.length)} servers...`, 'info', 5000);
+    FluxLogger.info('ServerBrowser', `Fetched ${String(servers.length)} servers, scanning regions...`);
 
-    const ids = servers.map(s => s.id).slice(0, 30);
-    const regionMap = await FluxGamesAPI.fetchServerRegions(currentGameId, ids);
+    const scanCount = getRegionScanCount();
+    const idsToScan = servers.slice(0, scanCount).map(s => s.id);
+    const regionMap = await FluxGamesAPI.fetchServerRegions(currentGameId, idsToScan);
 
     const allTokens: string[] = [];
     const tokenSet = new Set<string>();
-    servers.forEach(s => { s.playerTokens.forEach(t => { if (!tokenSet.has(t)) { tokenSet.add(t); allTokens.push(t); } }); });
+    servers.forEach(s => {
+      s.playerTokens.forEach(t => { if (!tokenSet.has(t)) { tokenSet.add(t); allTokens.push(t); } });
+    });
+
+    FluxLogger.info('ServerBrowser', `Unique player tokens to resolve: ${String(allTokens.length)}`);
 
     const thumbnailMap = new Map<string, string>();
     if (allTokens.length > 0) {
       const chunks = FluxUtils.chunk(allTokens, 100);
-      FluxLogger.info(`Fetching thumbnails for ${String(allTokens.length)} players in ${String(chunks.length)} batch(es)`);
+      FluxLogger.info('ServerBrowser', `Fetching thumbnails in ${String(chunks.length)} batch(es)`);
+      FluxLogger.timeStart('thumbnail-fetch');
       for (let i = 0; i < chunks.length; i++) {
         try {
           const chunk = chunks[i];
           if (chunk === undefined) continue;
           const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(chunk, false);
-          thumbs.forEach(t => { if (t.imageUrl && t.requestId) { const parts = t.requestId.split(':'); if (parts.length >= 2 && parts[1] !== undefined) thumbnailMap.set(parts[1], t.imageUrl); } });
-        } catch (e) { FluxLogger.info(`Thumbnail batch ${String(i + 1)} failed: ${String(e)}`); }
+          let resolvedInChunk = 0;
+          thumbs.forEach(t => {
+            if (t.imageUrl && t.requestId) {
+              const parts = t.requestId.split(':');
+              if (parts.length >= 2 && parts[1] !== undefined) {
+                thumbnailMap.set(parts[1], t.imageUrl);
+                resolvedInChunk++;
+              }
+            }
+          });
+          FluxLogger.debug('ServerBrowser', `Thumbnail batch ${String(i + 1)}/${String(chunks.length)}: ${String(resolvedInChunk)} resolved out of ${String(chunk.length)} tokens`);
+        } catch (e) {
+          FluxLogger.warn('ServerBrowser', `Thumbnail batch ${String(i + 1)}/${String(chunks.length)} failed: ${String(e)}`);
+        }
         if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 300));
       }
-      FluxLogger.info(`Got ${String(thumbnailMap.size)} thumbnails`);
+      FluxLogger.timeEnd('thumbnail-fetch', 'ServerBrowser');
+      FluxLogger.info('ServerBrowser', `Thumbnail map built: ${String(thumbnailMap.size)}/${String(allTokens.length)} player tokens resolved`);
     }
 
-    allServers = servers.slice(0, 30).map(s => ({
+    allServers = servers.slice(0, scanCount).map(s => ({
       id: s.id,
       playing: s.playing,
       maxPlayers: s.maxPlayers,
       playerTokens: s.playerTokens,
-      thumbnails: s.playerTokens.slice(0, 5).map(t => thumbnailMap.get(t) ?? null).filter((x): x is string => x !== null),
+      thumbnails: s.playerTokens.slice(0, MAX_SLOTS).map(t => thumbnailMap.get(t) ?? null).filter((x): x is string => x !== null),
       region: regionMap.get(s.id) ?? null,
     }));
 
+    const withRegion = allServers.filter(s => s.region !== null).length;
+    const withoutRegion = allServers.length - withRegion;
+    FluxLogger.info('ServerBrowser', `Servers ready: ${String(allServers.length)} total (${String(withRegion)} with region, ${String(withoutRegion)} without)`);
+
     regionScanDone = true;
-    FluxLogger.info(`Region scan: ${String(allServers.length)} servers ready`);
 
     const savedRegion = FluxStorage.get('serverregionfilter');
-    if (savedRegion) applyRegionFilter(savedRegion);
-    else renderServerCards(allServers);
+    if (savedRegion) {
+      FluxLogger.info('ServerBrowser', `Applying saved region filter: "${savedRegion}"`);
+      applyRegionFilter(savedRegion);
+    } else {
+      FluxLogger.info('ServerBrowser', 'No saved region filter, rendering all servers');
+      renderServerCards(allServers);
+    }
     observeServerList();
   }
 
   function renderServerCards(servers: ServerCard[]): void {
     displayedServers = servers;
     const container = document.querySelector('#rbx-public-game-server-item-container');
-    if (!container) return;
+    if (!container) {
+      FluxLogger.warn('ServerBrowser', 'Server container not found in DOM');
+      return;
+    }
 
     _rendering = true;
     container.innerHTML = '';
@@ -105,6 +164,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     servers.forEach(s => fragment.appendChild(createServerCard(s)));
     container.appendChild(fragment);
     _rendering = false;
+    FluxLogger.debug('ServerBrowser', `Rendered ${String(servers.length)} server cards`);
   }
 
   function createServerCard(server: ServerCard): HTMLElement {
@@ -112,7 +172,6 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     const card = FluxDOM.el('div', { className: 'card-item card-item-public-server' });
     const thumbsContainer = FluxDOM.el('div', { className: 'player-thumbnails-container' });
 
-    const maxSlots = 6;
     const isFull = server.playing >= server.maxPlayers;
     const totalTokens = server.playerTokens.length;
 
@@ -123,8 +182,8 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       countDiv.appendChild(badge);
       thumbsContainer.appendChild(countDiv);
     } else {
-      const thumbsToShow = server.thumbnails.slice(0, maxSlots);
-      for (let i = 0; i < maxSlots; i++) {
+      const thumbsToShow = server.thumbnails.slice(0, MAX_SLOTS);
+      for (let i = 0; i < MAX_SLOTS; i++) {
         const avatar = FluxDOM.el('span', { className: 'avatar avatar-headshot-md player-avatar' });
         const imgContainer = FluxDOM.el('span', { className: 'thumbnail-2d-container avatar-card-image' });
 
@@ -147,14 +206,14 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       }
     }
 
-    if (totalTokens > maxSlots) {
+    if (totalTokens > MAX_SLOTS) {
       const children = thumbsContainer.children;
-      if (children.length >= maxSlots) {
-        const lastAvatar = children[maxSlots - 1] as HTMLElement | undefined;
+      if (children.length >= MAX_SLOTS) {
+        const lastAvatar = children[MAX_SLOTS - 1] as HTMLElement | undefined;
         if (lastAvatar) {
           lastAvatar.style.position = 'relative';
           const badge = FluxDOM.el('span', { className: 'ff-overflow-badge' });
-          badge.textContent = `+${String(totalTokens - maxSlots)}`;
+          badge.textContent = `+${String(totalTokens - MAX_SLOTS)}`;
           lastAvatar.appendChild(badge);
         }
       }
@@ -169,6 +228,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     joinSpan.setAttribute('data-placeid', String(currentGameId));
     const joinBtn = FluxDOM.el('button', { className: 'btn-full-width btn-control-xs rbx-public-game-server-join game-server-join-btn btn-primary-md btn-min-width ff-btn ff-btn-sm ff-btn-primary' });
     joinBtn.addEventListener('click', () => {
+      FluxLogger.info('ServerBrowser', `Joining server ${server.id} via protocol handler`);
       FluxNotifications.show('Joining server...', 'info', 2000);
       window.location.href = `roblox://placeId=${String(currentGameId)}&gameInstanceId=${server.id}`;
     });
@@ -200,25 +260,67 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
   function applyRegionFilter(countryCode: string): void {
     FluxStorage.set('serverregionfilter', countryCode);
-    if (!countryCode) { renderServerCards(allServers); return; }
+
+    if (!countryCode) {
+      FluxLogger.info('ServerBrowser', 'Region filter cleared — showing all servers unsorted');
+      renderServerCards(allServers);
+      return;
+    }
 
     const targetGroup = FluxConstants.getCountryGroup(countryCode);
-    const sorted = [...allServers].sort((a, b) => {
-      const aCC = a.region?.countryCode ?? null;
-      const bCC = b.region?.countryCode ?? null;
-      const aExact = aCC === countryCode ? 0 : 1;
-      const bExact = bCC === countryCode ? 0 : 1;
-      if (aExact !== bExact) return aExact - bExact;
-      if (targetGroup && aCC && bCC) {
-        const aSame = FluxConstants.getCountryGroup(aCC) === targetGroup ? 0 : 1;
-        const bSame = FluxConstants.getCountryGroup(bCC) === targetGroup ? 0 : 1;
-        if (aSame !== bSame) return aSame - bSame;
+    FluxLogger.info('ServerBrowser', `Sorting servers by region: target="${countryCode}"${targetGroup ? ` group="${targetGroup}"` : ''}`);
+
+    const scored = allServers.map(s => {
+      const aCC = s.region?.countryCode ?? null;
+
+      let priority: number;
+      if (aCC === countryCode) {
+        // Exact match — highest priority
+        priority = 0;
+      } else if (targetGroup && aCC && FluxConstants.getCountryGroup(aCC) === targetGroup) {
+        // Same regional group — second priority
+        priority = 1;
+      } else if (aCC) {
+        // Known region but different group — third priority
+        priority = 2;
+      } else {
+        // Unknown/null region — lowest priority
+        priority = 3;
       }
-      return (aCC ? 0 : 1) - (bCC ? 0 : 1);
+
+      return { server: s, priority };
     });
 
+    // Sort by priority, then by playing count descending as tiebreaker
+    scored.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return b.server.playing - a.server.playing;
+    });
+
+    const sorted = scored.map(s => s.server);
+
+    const exact = sorted.filter(s => s.region?.countryCode === countryCode).length;
+    const sameGroup = targetGroup
+      ? sorted.filter(s => s.region?.countryCode !== countryCode && s.region?.countryCode && FluxConstants.getCountryGroup(s.region.countryCode) === targetGroup).length
+      : 0;
+    const other = sorted.filter(s => {
+      if (!s.region?.countryCode) return false;
+      if (s.region.countryCode === countryCode) return false;
+      if (targetGroup && FluxConstants.getCountryGroup(s.region.countryCode) === targetGroup) return false;
+      return true;
+    }).length;
+    const unknown = sorted.filter(s => s.region === null).length;
+
+    FluxLogger.info('ServerBrowser', `Region sort result — exact: ${String(exact)}, same-group: ${String(sameGroup)}, other: ${String(other)}, unknown: ${String(unknown)}`);
+
+    if (exact > 0) {
+      const first = sorted[0];
+      const firstName = first?.region?.city ?? first?.region?.country ?? 'Unknown';
+      FluxLogger.info('ServerBrowser', `First result: "${firstName}" (${first?.region?.countryCode ?? '?'}) — ${exact > 0 ? 'exact match present' : 'no exact match'}`);
+    }
+
     renderServerCards(sorted);
-    FluxNotifications.show(`${countryCode}: ${String(sorted.length)} servers`, 'info', 2000);
+    FluxNotifications.show(`${countryCode}: ${String(exact)} exact, ${String(sameGroup + other + unknown)} nearby`, 'info', 2500);
   }
 
   function injectFilterButtons(): void {
@@ -236,9 +338,11 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     qBtn.innerHTML = `${FluxIcons.get('zap', { size: 14 })} Quick Join`;
     FluxUtils.batchAppend(bar, [rBtn, fBtn, qBtn]);
     container.parentNode.insertBefore(bar, container);
+    FluxLogger.debug('ServerBrowser', 'Filter buttons injected');
   }
 
   function refreshServers(): void {
+    FluxLogger.info('ServerBrowser', 'Manual refresh triggered');
     allServers = [];
     regionScanDone = false;
     void scanAndCacheRegions();
@@ -246,43 +350,87 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
   function openFilterPanel(): void {
     FluxModals.custom((modal, close) => {
+      const currentCc = FluxStorage.get('serverregionfilter') ?? '';
+      const currentCount = getMaxServerCount();
+      const countOptions = [30, 50, 100, 200, 300];
+
       let groupsHTML = '';
       FluxConstants.REGION_CHIPS.forEach(group => {
         let groupChips = '';
-        group.chips.forEach(chip => { groupChips += `<div class="ff-region-chip" data-cc="${chip.cc}">${chip.label}</div>`; });
+        group.chips.forEach(chip => {
+          const active = chip.cc === currentCc ? ' ff-active' : '';
+          groupChips += `<div class="ff-region-chip${active}" data-cc="${chip.cc}">${chip.label}</div>`;
+        });
         groupsHTML += `<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#888;margin-bottom:4px;text-transform:uppercase">${group.group}</div><div style="display:flex;flex-wrap:wrap;gap:4px">${groupChips}</div></div>`;
       });
 
+      let countHTML = '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#888;margin-bottom:4px;text-transform:uppercase">Max Servers</div><div style="display:flex;flex-wrap:wrap;gap:4px">';
+      countOptions.forEach(n => {
+        const active = n === currentCount ? ' ff-active' : '';
+        countHTML += `<div class="ff-region-chip${active}" data-count="${String(n)}">${String(n)}</div>`;
+      });
+      countHTML += '</div></div>';
+
       modal.innerHTML =
         `<div style="padding:24px"><h3 style="margin:0 0 12px;font-size:16px">${FluxIcons.get('filter', { size: 16 })} Filters</h3>` +
-        '<div style="max-height:300px;overflow-y:auto;margin-top:8px">' +
-        '<div style="margin-bottom:10px"><div style="display:flex;flex-wrap:wrap;gap:4px"><div class="ff-region-chip ff-active" data-cc="">All Regions</div></div></div>' +
+        '<div style="max-height:400px;overflow-y:auto;margin-top:8px">' +
+        '<div style="margin-bottom:10px"><div style="display:flex;flex-wrap:wrap;gap:4px"><div class="ff-region-chip' + (currentCc === '' ? ' ff-active' : '') + '" data-cc="">All Regions</div></div></div>' +
+        `${countHTML}` +
         `${groupsHTML}</div>` +
         '<button class="ff-btn ff-btn-primary" id="ff-apply" style="margin-top:12px;width:100%">Apply</button></div>';
 
+      let selectedCc = currentCc;
+      let selectedCount = currentCount;
+
       modal.querySelectorAll('.ff-region-chip').forEach(chip => {
         chip.addEventListener('click', function (this: HTMLElement) {
-          modal.querySelectorAll('.ff-region-chip').forEach(c => { c.classList.remove('ff-active'); });
-          this.classList.add('ff-active');
+          const cc = this.dataset.cc;
+          const count = this.dataset.count;
+
+          if (cc !== undefined) {
+            // Deselect all, select this one
+            modal.querySelectorAll('.ff-region-chip[data-cc]').forEach(c => { c.classList.remove('ff-active'); });
+            this.classList.add('ff-active');
+            selectedCc = cc;
+          } else if (count !== undefined) {
+            // Deselect all count chips, select this one
+            modal.querySelectorAll('.ff-region-chip[data-count]').forEach(c => { c.classList.remove('ff-active'); });
+            this.classList.add('ff-active');
+            selectedCount = parseInt(count, 10);
+          }
         });
       });
 
       const applyBtn = modal.querySelector('#ff-apply');
       if (applyBtn) applyBtn.addEventListener('click', () => {
-        const active = modal.querySelector('.ff-region-chip.ff-active');
-        const cc = (active instanceof HTMLElement) ? (active.dataset.cc ?? '') : '';
-        applyRegionFilter(cc);
+        FluxLogger.info('ServerBrowser', `Filter applied: region="${selectedCc}", maxServers=${String(selectedCount)}`);
+
+        if (selectedCount !== currentCount) {
+          FluxStorage.set('serverfetchcount', selectedCount);
+          FluxLogger.info('ServerBrowser', `Server fetch count updated to ${String(selectedCount)} — will take effect on next refresh`);
+        }
+
+        applyRegionFilter(selectedCc);
         close();
       });
     });
   }
 
   function quickJoinRandom(): void {
-    if (allServers.length === 0) { FluxNotifications.show('No servers loaded', 'warning'); return; }
+    if (allServers.length === 0) {
+      FluxNotifications.show('No servers loaded', 'warning');
+      FluxLogger.warn('ServerBrowser', 'Quick join failed: no servers loaded');
+      return;
+    }
     const visible = allServers.filter(s => s.playing < s.maxPlayers);
-    if (visible.length === 0) { FluxNotifications.show('No available servers', 'warning'); return; }
+    if (visible.length === 0) {
+      FluxNotifications.show('No available servers', 'warning');
+      FluxLogger.warn('ServerBrowser', 'Quick join failed: all servers full');
+      return;
+    }
     const pick = visible[Math.floor(Math.random() * visible.length)];
     if (!pick) return;
+    FluxLogger.info('ServerBrowser', `Quick join: server ${pick.id} (${String(pick.playing)}/${String(pick.maxPlayers)} players)`);
     FluxNotifications.show('Joining random server...', 'info', 2000);
     window.location.href = `roblox://placeId=${String(currentGameId)}&gameInstanceId=${pick.id}`;
   }
@@ -297,24 +445,43 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       observeServerList();
     }, 400));
     serverObserver.observe(c, { childList: true, subtree: false });
+    FluxLogger.debug('ServerBrowser', 'MutationObserver attached to server list');
   }
 
   async function init(): Promise<void> {
     if (loaded) return;
-    if (!FluxStorage.getBool('togglefilterserversbutton', true)) return;
+    if (!FluxStorage.getBool('togglefilterserversbutton', true)) {
+      FluxLogger.info('ServerBrowser', 'Init skipped: feature disabled in settings');
+      return;
+    }
     currentGameId = FluxGamesAPI.getCurrentGameId();
-    if (!currentGameId) return;
+    if (!currentGameId) {
+      FluxLogger.warn('ServerBrowser', 'Init skipped: no game ID detected in URL');
+      return;
+    }
+
+    FluxLogger.info('ServerBrowser', `Initializing for game ${String(currentGameId)}`);
 
     const container = await FluxUtils.watchForChild('#game-instances, .tab-content, [class*="game-instances"]', '#rbx-public-game-server-item-container', 30000).catch(() => null);
-    if (!container) return;
+    if (!container) {
+      FluxLogger.warn('ServerBrowser', 'Init failed: server container not found after 30s');
+      return;
+    }
 
     loaded = true;
+    FluxLogger.info('ServerBrowser', 'Server container found, injecting UI');
     injectFilterButtons();
     observeServerList();
-    if (FluxStorage.getBool('autoserverregions', true)) void scanAndCacheRegions();
+    if (FluxStorage.getBool('autoserverregions', true)) {
+      FluxLogger.info('ServerBrowser', 'Auto region scan enabled, starting scan');
+      void scanAndCacheRegions();
+    } else {
+      FluxLogger.info('ServerBrowser', 'Auto region scan disabled, waiting for manual refresh');
+    }
   }
 
   function destroy(): void {
+    FluxLogger.info('ServerBrowser', 'Destroying');
     loaded = false;
     regionScanDone = false;
     allServers = [];

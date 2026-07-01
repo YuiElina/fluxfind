@@ -3,7 +3,7 @@
  * High-performance request layer with caching, retry, rate-limit handling, and batch support
  *
  * @module api/http-client
- * @license GPL-2.0-only
+ * @license AOL-1.0
  */
 
 import { FluxUtils } from '../core/utils';
