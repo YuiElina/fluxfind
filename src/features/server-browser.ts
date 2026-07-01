@@ -405,13 +405,15 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       if (applyBtn) applyBtn.addEventListener('click', () => {
         FluxLogger.info('ServerBrowser', `Filter applied: region="${selectedCc}", maxServers=${String(selectedCount)}`);
 
-        if (selectedCount !== currentCount) {
+        const countChanged = selectedCount !== currentCount;
+        if (countChanged) {
           FluxStorage.set('serverfetchcount', selectedCount);
-          FluxLogger.info('ServerBrowser', `Server fetch count updated to ${String(selectedCount)} — will take effect on next refresh`);
         }
 
-        applyRegionFilter(selectedCc);
+        // Always persist the region choice, then trigger a full refresh
+        FluxStorage.set('serverregionfilter', selectedCc);
         close();
+        refreshServers();
       });
     });
   }

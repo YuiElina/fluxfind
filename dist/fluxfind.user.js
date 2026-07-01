@@ -2065,12 +2065,13 @@
         const applyBtn = modal.querySelector("#ff-apply");
         if (applyBtn) applyBtn.addEventListener("click", () => {
           FluxLogger.info("ServerBrowser", `Filter applied: region="${selectedCc}", maxServers=${String(selectedCount)}`);
-          if (selectedCount !== currentCount) {
+          const countChanged = selectedCount !== currentCount;
+          if (countChanged) {
             FluxStorage.set("serverfetchcount", selectedCount);
-            FluxLogger.info("ServerBrowser", `Server fetch count updated to ${String(selectedCount)} \u2014 will take effect on next refresh`);
           }
-          applyRegionFilter(selectedCc);
+          FluxStorage.set("serverregionfilter", selectedCc);
           close();
+          refreshServers();
         });
       });
     }
