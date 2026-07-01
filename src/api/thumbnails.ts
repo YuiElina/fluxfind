@@ -33,7 +33,7 @@ export const FluxThumbnailsAPI = ((): {
       const results = Array.isArray(rawData) ? rawData : Object.values(rawData as Record<string, unknown>);
       const typed = results as ThumbResult[];
 
-      const successCount = typed.filter(r => r.imageUrl !== null && r.imageUrl !== undefined).length;
+      const successCount = typed.filter(r => r.imageUrl != null).length;
       const failCount = typed.length - successCount;
 
       FluxLogger.info('Thumbnails', `Batch result: ${String(successCount)} thumbnails resolved, ${String(failCount)} failed (${String(typed.length)} total)`);
@@ -60,7 +60,7 @@ export const FluxThumbnailsAPI = ((): {
       const result = ((r as { data?: unknown } | null)?.data ?? []) as { targetId: number; imageUrl: string | null }[];
       FluxLogger.debug('Thumbnails', `Group icons resolved: ${String(result.length)}`);
       return result;
-    }).catch(e => {
+    }).catch((e: unknown) => {
       FluxLogger.warn('Thumbnails', `Group icon fetch failed: ${String(e)}`);
       return [];
     });
@@ -77,7 +77,7 @@ export const FluxThumbnailsAPI = ((): {
       const result = ((r as { data?: unknown } | null)?.data ?? []) as { targetId: number; imageUrl: string | null }[];
       FluxLogger.debug('Thumbnails', `Catalog thumbnails resolved: ${String(result.length)}`);
       return result;
-    }).catch(e => {
+    }).catch((e: unknown) => {
       FluxLogger.warn('Thumbnails', `Catalog thumbnail fetch failed: ${String(e)}`);
       return [];
     });
