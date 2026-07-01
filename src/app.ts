@@ -31,7 +31,7 @@ export const FluxApp = ((): { init: () => void } => {
     FluxRouter.start((newPage: PageHandler) => {
       FluxLogger.info('App', `Page navigation: ${newPage}`);
       if (newPage === 'servers' || newPage === 'game') {
-        FluxFeatureServerBrowser.init().catch(e => {
+        FluxFeatureServerBrowser.init().catch((e: unknown) => {
           FluxLogger.warn('App', `ServerBrowser init failed: ${String(e)}`);
         });
       }
