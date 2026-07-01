@@ -14,7 +14,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { FluxConstants } from './src/config/constants';
-import {OnLoadArgs, OnLoadResult, PluginBuild} from "esbuild";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const VERSION = FluxConstants.VERSION;
 
@@ -93,30 +92,23 @@ async function build(): Promise<void> {
     treeShaking: true,
     minify: false,
     keepNames: true,
-    banner: {
-      js: '(function() {\n"use strict";\n',
-    },
-    footer: {
-      js: '\n})();',
-    },
+    legalComments: 'none',
     define: {
       'import.meta.url': 'undefined',
     },
     plugins: [
       {
         name: 'strip-use-strict',
-        setup: loadBuild
+        setup(build1) {
+          build1.onLoad({ filter: /\.ts$/ }, async (args) => {
+            let contents = fs.readFileSync(args.path, 'utf-8');
+            contents = contents.replace(/^["']use strict["'];\s*/gm, '');
+            return { contents, loader: 'ts' };
+          });
+        },
       },
     ],
   });
-
-  function loadBuild(plugin: PluginBuild): void {
-      plugin.onLoad({filter: /\.ts$/}, async (args: OnLoadArgs): Promise<OnLoadResult> => {
-          let contents = fs.readFileSync(args.path, 'utf-8');
-          contents = contents.replace(/^["']use["'];\s*/gm, '');
-          return {contents, loader: "ts"};
-      })
-  }
 
 
   if (result.errors.length > 0) {
@@ -131,16 +123,7 @@ async function build(): Promise<void> {
   const bundlePath = path.resolve(__dirname, 'dist', 'temp-bundle.js');
   let bundleContent = fs.readFileSync(bundlePath, 'utf-8');
 
-  // Wrap the global IIFE from esbuild inside our own
-  bundleContent = bundleContent.trim();
-  if (bundleContent.startsWith('(function()')) {
-    bundleContent = bundleContent.slice(12); // remove esbuild's "(function() {"
-  }
-  if (bundleContent.endsWith('})();')) {
-    bundleContent = bundleContent.slice(0, -5); // remove "})();"
-  }
-
-  const output = HEADER + LICENSE + '(function() {\n"use strict";\n' + bundleContent.trim() + '\n})();\n';
+  const output = HEADER + LICENSE + bundleContent.trim() + '\n';
 
   fs.writeFileSync(outPath, output, 'utf-8');
 

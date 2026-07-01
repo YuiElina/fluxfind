@@ -375,7 +375,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
         `<div style="padding:24px"><h3 style="margin:0 0 12px;font-size:16px">${FluxIcons.get('filter', { size: 16 })} Filters</h3>` +
         '<div style="max-height:400px;overflow-y:auto;margin-top:8px">' +
         '<div style="margin-bottom:10px"><div style="display:flex;flex-wrap:wrap;gap:4px"><div class="ff-region-chip' + (currentCc === '' ? ' ff-active' : '') + '" data-cc="">All Regions</div></div></div>' +
-        `${countHTML}` +
+        countHTML +
         `${groupsHTML}</div>` +
         '<button class="ff-btn ff-btn-primary" id="ff-apply" style="margin-top:12px;width:100%">Apply</button></div>';
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FluxFind
 // @namespace    https://github.com/YuiElina/fluxfind/
-// @version      0.1.0-alpha
+// @version      1.0.0
 // @description  Enhanced Roblox server browser with filtering, region detection, smart search, and quality-of-life improvements. Free and open source alternative to paid extensions.
 // @author       YuiElina
 // @match        https://www.roblox.com/*
@@ -48,11 +48,6 @@
  * @license AOL-1.0
  * @see https://github.com/YuiElina/AOL-LICENSE
  */
-
-(function() {
-"use strict";
-{
-"use strict";
 
 "use strict";
 (() => {
@@ -1522,7 +1517,7 @@
         const settled = await Promise.allSettled(chunk.map((sid) => fetchSingleRegion(gameId, sid)));
         const retryIds = [];
         for (const s of settled) {
-          if (s.status === "fulfilled" && s.value !== void 0) {
+          if (s.status === "fulfilled") {
             const val = s.value;
             if (val.result !== null) {
               results.set(val.sid, val.result);
@@ -1539,7 +1534,7 @@
           await new Promise((r) => setTimeout(r, 500));
           const retrySettled = await Promise.allSettled(retryIds.map((sid) => fetchSingleRegion(gameId, sid)));
           for (const s of retrySettled) {
-            if (s.status === "fulfilled" && s.value !== void 0) {
+            if (s.status === "fulfilled") {
               const val = s.value;
               if (val.result !== null) {
                 results.set(val.sid, val.result);
@@ -1674,7 +1669,7 @@
         const rawData = data?.data ?? [];
         const results = Array.isArray(rawData) ? rawData : Object.values(rawData);
         const typed = results;
-        const successCount = typed.filter((r) => r.imageUrl !== null && r.imageUrl !== void 0).length;
+        const successCount = typed.filter((r) => r.imageUrl != null).length;
         const failCount = typed.length - successCount;
         FluxLogger.info("Thumbnails", `Batch result: ${String(successCount)} thumbnails resolved, ${String(failCount)} failed (${String(typed.length)} total)`);
         if (failCount > 0) {
@@ -2045,7 +2040,7 @@
           countHTML += `<div class="ff-region-chip${active}" data-count="${String(n)}">${String(n)}</div>`;
         });
         countHTML += "</div></div>";
-        modal.innerHTML = `<div style="padding:24px"><h3 style="margin:0 0 12px;font-size:16px">${FluxIcons.get("filter", { size: 16 })} Filters</h3><div style="max-height:400px;overflow-y:auto;margin-top:8px"><div style="margin-bottom:10px"><div style="display:flex;flex-wrap:wrap;gap:4px"><div class="ff-region-chip` + (currentCc === "" ? " ff-active" : "") + `" data-cc="">All Regions</div></div></div>${countHTML}${groupsHTML}</div><button class="ff-btn ff-btn-primary" id="ff-apply" style="margin-top:12px;width:100%">Apply</button></div>`;
+        modal.innerHTML = `<div style="padding:24px"><h3 style="margin:0 0 12px;font-size:16px">${FluxIcons.get("filter", { size: 16 })} Filters</h3><div style="max-height:400px;overflow-y:auto;margin-top:8px"><div style="margin-bottom:10px"><div style="display:flex;flex-wrap:wrap;gap:4px"><div class="ff-region-chip` + (currentCc === "" ? " ff-active" : "") + '" data-cc="">All Regions</div></div></div>' + countHTML + `${groupsHTML}</div><button class="ff-btn ff-btn-primary" id="ff-apply" style="margin-top:12px;width:100%">Apply</button></div>`;
         let selectedCc = currentCc;
         let selectedCount = currentCount;
         modal.querySelectorAll(".ff-region-chip").forEach((chip) => {
@@ -2268,12 +2263,4 @@
   } else {
     FluxApp.init();
   }
-})();
-/**
- * FluxFind HTTP Client Module
- * High-performance request layer with caching, retry, rate-limit handling, and batch support
- *
- * @module api/http-client
- * @license AOL-1.0
- */
 })();
