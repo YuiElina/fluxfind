@@ -2193,7 +2193,6 @@ GM_addStyle(`/* === CSS Custom Properties === */
   })();
 
   // src/api/thumbnails.ts
-  init_http_client();
   init_logger();
   var FluxThumbnailsAPI = (() => {
     "use strict";
@@ -2210,56 +2209,136 @@ GM_addStyle(`/* === CSS Custom Properties === */
         size: "150x150"
       }));
       FluxLogger.debug("Thumbnails", `Batch request: ${String(tokens.length)} tokens`);
-      try {
-        const data = await FluxHttpClient.post(`${THUMBNAILS_API}/batch`, body, { cache: false, retries: 2 });
-        const rawData = data?.data ?? [];
-        const results = Array.isArray(rawData) ? rawData : Object.values(rawData);
-        const typed = results;
-        const successCount = typed.filter((r) => r.imageUrl != null).length;
-        const failCount = typed.length - successCount;
-        FluxLogger.info("Thumbnails", `Batch result: ${String(successCount)} thumbnails resolved, ${String(failCount)} failed (${String(typed.length)} total)`);
-        if (failCount > 0) {
-          FluxLogger.warn("Thumbnails", `${String(failCount)} thumbnails returned no imageUrl \u2014 API may have rejected some tokens`);
-        }
-        return typed;
-      } catch (e) {
-        FluxLogger.error("Thumbnails", `Batch request failed: ${String(e)}`);
-        return [];
+      const data = await gmPost(`${THUMBNAILS_API}/batch`, body);
+      const rawData = data.data ?? [];
+      const results = Array.isArray(rawData) ? rawData : Object.values(rawData);
+      const typed = results;
+      const successCount = typed.filter((r) => r.imageUrl != null).length;
+      const failCount = typed.length - successCount;
+      FluxLogger.info("Thumbnails", `Batch result: ${String(successCount)} thumbnails resolved, ${String(failCount)} failed (${String(typed.length)} total)`);
+      if (failCount > 0) {
+        FluxLogger.warn("Thumbnails", `${String(failCount)} thumbnails returned no imageUrl`);
       }
+      return typed;
     }
     __name(fetchPlayerThumbnailsByTokens, "fetchPlayerThumbnailsByTokens");
+    function gmPost(url, body) {
+      return new Promise((resolve) => {
+        if (typeof GM_xmlhttpRequest === "undefined") {
+          FluxLogger.warn("Thumbnails", "GM_xmlhttpRequest not available, falling back to fetch");
+          void fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(body)
+          }).then((r) => r.json()).then(resolve).catch(() => {
+            FluxLogger.error("Thumbnails", "Fetch fallback failed");
+            resolve({});
+          });
+          return;
+        }
+        function attempt() {
+          GM_xmlhttpRequest({
+            method: "POST",
+            url,
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            data: JSON.stringify(body),
+            anonymous: false,
+            timeout: 15e3,
+            onload: /* @__PURE__ */ __name(function(response) {
+              if (response.status === 429) {
+                FluxLogger.debug("Thumbnails", "Rate limited (429), retrying after 500ms...");
+                setTimeout(attempt, 500);
+                return;
+              }
+              if (response.status >= 200 && response.status < 300) {
+                try {
+                  resolve(JSON.parse(response.responseText));
+                } catch {
+                  FluxLogger.warn("Thumbnails", "Failed to parse batch response");
+                  resolve({});
+                }
+              } else {
+                FluxLogger.warn("Thumbnails", `HTTP ${String(response.status)} from thumbnail API`);
+                resolve({});
+              }
+            }, "onload"),
+            onerror: /* @__PURE__ */ __name(function() {
+              FluxLogger.warn("Thumbnails", "Network error on thumbnail batch request");
+              resolve({});
+            }, "onerror"),
+            ontimeout: /* @__PURE__ */ __name(function() {
+              FluxLogger.warn("Thumbnails", "Timeout on thumbnail batch request");
+              resolve({});
+            }, "ontimeout")
+          });
+        }
+        __name(attempt, "attempt");
+        attempt();
+      });
+    }
+    __name(gmPost, "gmPost");
     async function fetchGroupIconsBatch(groupIds) {
       if (groupIds.length === 0) return [];
       FluxLogger.debug("Thumbnails", `Fetching icons for ${String(groupIds.length)} groups`);
-      return FluxHttpClient.get(
-        `${THUMBNAILS_API}/groups/icons`,
-        { groupIds: groupIds.join(","), size: "150x150", format: "Png", isCircular: "false" },
-        { cache: true }
-      ).then((r) => {
-        const result = r?.data ?? [];
+      try {
+        const data = await gmGet(`${THUMBNAILS_API}/groups/icons?groupIds=${groupIds.join(",")}&size=150x150&format=Png&isCircular=false`);
+        const result = data.data ?? [];
         FluxLogger.debug("Thumbnails", `Group icons resolved: ${String(result.length)}`);
         return result;
-      }).catch((e) => {
+      } catch (e) {
         FluxLogger.warn("Thumbnails", `Group icon fetch failed: ${String(e)}`);
         return [];
-      });
+      }
     }
     __name(fetchGroupIconsBatch, "fetchGroupIconsBatch");
+    function gmGet(url) {
+      return new Promise((resolve) => {
+        if (typeof GM_xmlhttpRequest === "undefined") {
+          void fetch(url, { credentials: "include" }).then((r) => r.json()).then(resolve).catch(() => {
+            resolve({});
+          });
+          return;
+        }
+        GM_xmlhttpRequest({
+          method: "GET",
+          url,
+          headers: { "Accept": "application/json" },
+          anonymous: false,
+          timeout: 1e4,
+          onload: /* @__PURE__ */ __name(function(response) {
+            if (response.status >= 200 && response.status < 300) {
+              try {
+                resolve(JSON.parse(response.responseText));
+              } catch {
+                resolve({});
+              }
+            } else {
+              resolve({});
+            }
+          }, "onload"),
+          onerror: /* @__PURE__ */ __name(function() {
+            resolve({});
+          }, "onerror"),
+          ontimeout: /* @__PURE__ */ __name(function() {
+            resolve({});
+          }, "ontimeout")
+        });
+      });
+    }
+    __name(gmGet, "gmGet");
     async function fetchCatalogThumbnailsBatch(assetIds) {
       if (assetIds.length === 0) return [];
       FluxLogger.debug("Thumbnails", `Fetching catalog thumbnails for ${String(assetIds.length)} assets`);
-      return FluxHttpClient.get(
-        `${THUMBNAILS_API}/assets`,
-        { assetIds: assetIds.join(","), size: "150x150", format: "png", isCircular: "false" },
-        { cache: true }
-      ).then((r) => {
-        const result = r?.data ?? [];
+      try {
+        const data = await gmGet(`${THUMBNAILS_API}/assets?assetIds=${assetIds.join(",")}&size=150x150&format=png&isCircular=false`);
+        const result = data.data ?? [];
         FluxLogger.debug("Thumbnails", `Catalog thumbnails resolved: ${String(result.length)}`);
         return result;
-      }).catch((e) => {
+      } catch (e) {
         FluxLogger.warn("Thumbnails", `Catalog thumbnail fetch failed: ${String(e)}`);
         return [];
-      });
+      }
     }
     __name(fetchCatalogThumbnailsBatch, "fetchCatalogThumbnailsBatch");
     return { fetchPlayerThumbnailsByTokens, fetchGroupIconsBatch, fetchCatalogThumbnailsBatch };
