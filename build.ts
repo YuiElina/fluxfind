@@ -13,9 +13,10 @@ import * as esbuild from 'esbuild';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-
+import { FluxConstants } from './src/config/constants';
+import {OnLoadArgs, OnLoadResult, PluginBuild} from "esbuild";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const VERSION = '0.1.0-alpha';
+const VERSION = FluxConstants.VERSION;
 
 const HEADER = `// ==UserScript==
 // @name         FluxFind
@@ -104,17 +105,19 @@ async function build(): Promise<void> {
     plugins: [
       {
         name: 'strip-use-strict',
-        setup(build1) {
-          build1.onLoad({ filter: /\.ts$/ }, async (args) => {
-            let contents = fs.readFileSync(args.path, 'utf-8');
-            // Remove module-level 'use strict' since IIFE handles it
-            contents = contents.replace(/^["']use strict["'];\s*/gm, '');
-            return { contents, loader: 'ts' };
-          });
-        },
+        setup: loadBuild
       },
     ],
   });
+
+  function loadBuild(plugin: PluginBuild): void {
+      plugin.onLoad({filter: /\.ts$/}, async (args: OnLoadArgs): Promise<OnLoadResult> => {
+          let contents = fs.readFileSync(args.path, 'utf-8');
+          contents = contents.replace(/^["']use["'];\s*/gm, '');
+          return {contents, loader: "ts"};
+      })
+  }
+
 
   if (result.errors.length > 0) {
     console.error('  BUILD FAILED:');
