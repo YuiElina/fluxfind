@@ -283,19 +283,6 @@ GM_addStyle(`/* === CSS Custom Properties === */
 }
 
 /* Flexbox layout with centered wrapping for consistent thumbnail rows */
-.stack .card-list .card-item .player-thumbnails-container {
-    -ms-flex-wrap: wrap;
-    flex-wrap: wrap;
-    -ms-flex-pack: start;
-    justify-content: center;
-    -ms-flex-item-align: center;
-    align-self: center;
-    gap: 6px;
-    max-width: 192px;
-    display: -ms-flexbox;
-    display: flex;
-}
-
 .player-thumbnails-container {
     display: flex !important;
     flex-wrap: wrap;
@@ -324,11 +311,122 @@ GM_addStyle(`/* === CSS Custom Properties === */
 
 .card-item.card-item-friends-server {
     border-radius: 12px;
+    height: 100%;
+}
+
+#rbx-friends-game-server-item-container {
+    display: flex;
+    flex-wrap: wrap;
 }
 
 .rbx-public-game-server-item-container {
     display: flex;
     flex-wrap: wrap;
+}
+
+/* === Segmented Pill Navigation === */
+.ff-segmented-nav {
+    display: flex;
+    position: relative;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 100px;
+    padding: 4px;
+    gap: 2px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+    z-index: 1;
+}
+
+.ff-segmented-nav::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 100px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.ff-segmented-item {
+    position: relative;
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.55);
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.25s ease;
+    z-index: 2;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+}
+
+.ff-segmented-item:hover {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.ff-segmented-item.ff-active {
+    color: #fff;
+    font-weight: 600;
+    text-shadow: 0 0 12px rgba(108, 92, 231, 0.3);
+}
+
+/* Animated pill indicator */
+.ff-segmented-indicator {
+    position: absolute;
+    top: 4px;
+    height: calc(100% - 8px);
+    border-radius: 100px;
+    background: var(--ff-accent);
+    z-index: 1;
+    transition: left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 2px 12px rgba(108, 92, 231, 0.4), 0 0 20px rgba(108, 92, 231, 0.2);
+    pointer-events: none;
+}
+
+/* Glossy shine sweep on the active pill */
+.ff-segmented-indicator::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -75%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.25) 50%, transparent 100%);
+    border-radius: 100px;
+    animation: ff-shine-sweep 1.8s ease-in-out infinite;
+}
+
+@keyframes ff-shine-sweep {
+    0% { left: -75%; opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { left: 125%; opacity: 0; }
+}
+
+/* Tab content fade + slide transition */
+.ff-settings-tab-content {
+    animation: ff-tab-fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ff-tab-fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+        filter: blur(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
 }
 
 /* === Floating Settings Button === */
@@ -1634,95 +1732,160 @@ GM_addStyle(`/* === CSS Custom Properties === */
   })();
 
   // src/ui/settings-panel.ts
+  var TABS = [
+    { key: "filters", label: "Filters" },
+    { key: "appearance", label: "Appearance" },
+    { key: "privacy", label: "Privacy" },
+    { key: "ads", label: "Ads & Stats" }
+  ];
   var FluxSettingsPanel = /* @__PURE__ */ (() => {
     function open() {
       FluxLogger.info("Settings", "Opening settings panel");
-      const stats = FluxFeatureAdRemover.getStats();
-      FluxModals.custom((modal, close) => {
-        modal.innerHTML = '<div style="padding:24px"><h3 style="margin:0 0 16px;font-size:18px;display:flex;align-items:center;gap:8px">' + FluxIcons.get("settings", { size: 20 }) + ' FluxFind Settings</h3><div style="display:flex;flex-direction:column;gap:12px">' + toggleRow("togglefilterserversbutton", "Server Filters", "Show filter controls on game server pages") + toggleRow("autoserverregions", "Auto Region Scan", "Automatically fetch server locations") + toggleRow("removeads", "Remove Ads", "Remove promotional content from pages") + toggleRow("responsivegamecards", "Responsive Cards", "Make game cards adapt to screen width") + toggleRow("forcedarkmode", "Dark Mode", "Override page theme to dark") + toggleRow("smartsearch", "Smart Search", "Enhanced search suggestions") + toggleRow("disablechat", "Disable Chat", "Remove the chat sidebar") + toggleRow("enableLogs", "Debug Logs", "Show FluxFind logs in console") + '</div><div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--ff-border)"><h4 style="margin:0 0 10px;font-size:14px">' + FluxIcons.get("barChart", { size: 14 }) + ' Statistics</h4><div style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ff-text-secondary)"><div style="display:flex;justify-content:space-between"><span>Ads blocked this session:</span><strong>' + String(stats.blockedSession) + '</strong></div><div style="display:flex;justify-content:space-between"><span>Ads blocked (total):</span><strong>' + String(stats.blockedTotal) + '</strong></div></div><button id="ff-reset-stats" class="ff-btn ff-btn-sm ff-btn-danger" style="margin-top:8px;width:100%">' + FluxIcons.get("trash", { size: 14 }) + ' Reset Stats</button></div><div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="ff-btn ff-btn-primary" id="ff-close-settings">Close</button></div></div>';
-        const closeBtn = modal.querySelector("#ff-close-settings");
-        if (closeBtn) closeBtn.addEventListener("click", () => {
-          FluxLogger.debug("Settings", "Settings panel closed");
-          close();
-        });
-        const resetBtn = modal.querySelector("#ff-reset-stats");
-        if (resetBtn) resetBtn.addEventListener("click", () => {
-          FluxFeatureAdRemover.resetStats();
-          FluxLogger.info("Settings", "Ad block stats reset");
-          const updatedStats = FluxFeatureAdRemover.getStats();
-          const sessionEl = modal.querySelector(".ff-stats-session");
-          const totalEl = modal.querySelector(".ff-stats-total");
-          if (sessionEl) sessionEl.textContent = String(updatedStats.blockedSession);
-          if (totalEl) totalEl.textContent = String(updatedStats.blockedTotal);
-        });
-        modal.querySelectorAll(".ff-toggle-input").forEach((input) => {
-          input.addEventListener("change", function() {
-            const key = this.dataset.key;
-            if (!key) return;
-            const checked = this.checked;
-            FluxStorage.setBool(key, checked);
-            FluxLogger.info("Settings", `Toggle changed: ${key} = ${String(checked)}`);
-            applySettingChange(key, checked);
-          });
-        });
-        const statsRows = modal.querySelectorAll(".ff-stats-session, .ff-stats-total");
-        if (statsRows.length === 0) {
-          const strongEls = modal.querySelectorAll('[style*="justify-content:space-between"] strong');
-          if (strongEls[0]) strongEls[0].classList.add("ff-stats-session");
-          if (strongEls[1]) strongEls[1].classList.add("ff-stats-total");
+      FluxModals.custom((modal, _close) => {
+        let activeTab = "filters";
+        function renderNav(container) {
+          container.innerHTML = `
+          <div class="ff-segmented-nav" id="ff-segmented-nav">
+            <div class="ff-segmented-indicator" id="ff-segmented-indicator"></div>
+            ${TABS.map((t) => `<div class="ff-segmented-item ${t.key === activeTab ? "ff-active" : ""}" data-tab="${t.key}">${t.label}</div>`).join("")}
+          </div>`;
         }
+        __name(renderNav, "renderNav");
+        function renderContent(container) {
+          container.innerHTML = '<div class="ff-settings-tab-content" id="ff-settings-tab-content"></div>';
+          const tabContent = container.querySelector("#ff-settings-tab-content");
+          if (tabContent) tabContent.innerHTML = getTabHTML(activeTab);
+        }
+        __name(renderContent, "renderContent");
+        function updateIndicator() {
+          const nav = document.querySelector("#ff-segmented-nav");
+          const indicator = document.querySelector("#ff-segmented-indicator");
+          const activeItem = nav?.querySelector(".ff-segmented-item.ff-active");
+          if (!indicator || !activeItem || !nav) return;
+          const navRect = nav.getBoundingClientRect();
+          const itemRect = activeItem.getBoundingClientRect();
+          const indicatorEl = indicator;
+          indicatorEl.style.left = `${String(itemRect.left - navRect.left)}px`;
+          indicatorEl.style.width = `${String(itemRect.width)}px`;
+        }
+        __name(updateIndicator, "updateIndicator");
+        function switchTab(key) {
+          if (activeTab === key) return;
+          activeTab = key;
+          const navContainer2 = modal.querySelector("#ff-segmented-nav")?.parentElement;
+          if (navContainer2) renderNav(navContainer2);
+          const contentContainer2 = modal.querySelector("#ff-settings-tab-content")?.parentElement;
+          if (contentContainer2) renderContent(contentContainer2);
+          wireNavHandlers();
+          requestAnimationFrame(() => {
+            updateIndicator();
+          });
+          wireToggleHandlers(modal);
+        }
+        __name(switchTab, "switchTab");
+        function wireNavHandlers() {
+          modal.querySelectorAll(".ff-segmented-item").forEach((item) => {
+            item.addEventListener("click", function() {
+              const tab = this.dataset.tab;
+              if (tab) switchTab(tab);
+            });
+          });
+        }
+        __name(wireNavHandlers, "wireNavHandlers");
+        function wireToggleHandlers(parentEl) {
+          parentEl.querySelectorAll(".ff-toggle-input").forEach((input) => {
+            input.addEventListener("change", function() {
+              const key = this.dataset.key;
+              if (!key) return;
+              const checked = this.checked;
+              FluxStorage.setBool(key, checked);
+              FluxLogger.info("Settings", `Toggle changed: ${key} = ${String(checked)}`);
+              applySettingChange(key, checked);
+            });
+          });
+        }
+        __name(wireToggleHandlers, "wireToggleHandlers");
+        function wireResetStats(parentEl) {
+          const resetBtn = parentEl.querySelector("#ff-reset-stats");
+          if (resetBtn) resetBtn.addEventListener("click", () => {
+            FluxFeatureAdRemover.resetStats();
+            FluxLogger.info("Settings", "Ad block stats reset");
+            const updatedStats = FluxFeatureAdRemover.getStats();
+            const sessionEl = parentEl.querySelector(".ff-stats-session");
+            const totalEl = parentEl.querySelector(".ff-stats-total");
+            if (sessionEl) sessionEl.textContent = String(updatedStats.blockedSession);
+            if (totalEl) totalEl.textContent = String(updatedStats.blockedTotal);
+          });
+        }
+        __name(wireResetStats, "wireResetStats");
+        modal.innerHTML = `
+        <div style="padding:24px;display:flex;flex-direction:column;max-height:500px">
+          <h3 style="margin:0 0 16px;font-size:18px;display:flex;align-items:center;gap:8px">
+            ${FluxIcons.get("settings", { size: 20 })} FluxFind Settings
+          </h3>
+          <div id="ff-nav-container"></div>
+          <div id="ff-content-container" style="flex:1;overflow-y:auto"></div>
+        </div>`;
+        const navContainer = modal.querySelector("#ff-nav-container");
+        const contentContainer = modal.querySelector("#ff-content-container");
+        if (navContainer) renderNav(navContainer);
+        if (contentContainer) renderContent(contentContainer);
+        wireNavHandlers();
+        wireToggleHandlers(modal);
+        wireResetStats(modal);
+        requestAnimationFrame(() => {
+          updateIndicator();
+        });
       });
     }
     __name(open, "open");
+    function getTabHTML(tab) {
+      switch (tab) {
+        case "filters":
+          return `<div style="display:flex;flex-direction:column;gap:8px">${toggleRow("togglefilterserversbutton", "Server Filters", "Show filter controls on game server pages")}${toggleRow("autoserverregions", "Auto Region Scan", "Automatically fetch server locations")}</div>`;
+        case "appearance":
+          return `<div style="display:flex;flex-direction:column;gap:8px">${toggleRow("forcedarkmode", "Dark Mode", "Override page theme to dark")}${toggleRow("responsivegamecards", "Responsive Cards", "Make game cards adapt to screen width")}${toggleRow("smartsearch", "Smart Search", "Enhanced search suggestions")}</div>`;
+        case "privacy":
+          return `<div style="display:flex;flex-direction:column;gap:8px">${toggleRow("disablechat", "Disable Chat", "Remove the chat sidebar")}${toggleRow("enableLogs", "Debug Logs", "Show FluxFind logs in console")}</div>`;
+        case "ads": {
+          const stats = FluxFeatureAdRemover.getStats();
+          return `<div style="display:flex;flex-direction:column;gap:8px">${toggleRow("removeads", "Remove Ads", "Remove promotional content from pages")}<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--ff-border)"><h4 style="margin:0 0 10px;font-size:14px">${FluxIcons.get("barChart", { size: 14 })} Statistics</h4><div style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ff-text-secondary)"><div style="display:flex;justify-content:space-between"><span>Ads blocked this session:</span><strong class="ff-stats-session">${String(stats.blockedSession)}</strong></div><div style="display:flex;justify-content:space-between"><span>Ads blocked (total):</span><strong class="ff-stats-total">${String(stats.blockedTotal)}</strong></div></div><button id="ff-reset-stats" class="ff-btn ff-btn-sm ff-btn-danger" style="margin-top:8px;width:100%">${FluxIcons.get("trash", { size: 14 })} Reset Stats</button></div></div>`;
+        }
+      }
+    }
+    __name(getTabHTML, "getTabHTML");
     function applySettingChange(key, value) {
       switch (key) {
-        case "forcedarkmode": {
+        case "forcedarkmode":
           if (value) {
             document.documentElement.classList.add("ff-dark-mode");
             document.body.style.setProperty("background-color", "var(--ff-bg-primary)", "important");
-            FluxLogger.debug("Settings", "Dark mode applied to body");
           } else {
             document.documentElement.classList.remove("ff-dark-mode");
             document.body.style.removeProperty("background-color");
-            FluxLogger.debug("Settings", "Dark mode removed from body");
           }
           break;
-        }
         case "disablechat": {
           const chatContainer = document.querySelector('#chat-container, .chat-main, [class*="chat"]');
-          if (chatContainer instanceof HTMLElement) {
-            chatContainer.style.display = value ? "none" : "";
-            FluxLogger.debug("Settings", `Chat sidebar: ${value ? "hidden" : "shown"}`);
-          } else {
-            FluxLogger.warn("Settings", "Chat container not found \u2014 cannot toggle visibility in real-time");
-          }
+          if (chatContainer instanceof HTMLElement) chatContainer.style.display = value ? "none" : "";
           break;
         }
-        case "removeads": {
-          if (value) {
-            FluxFeatureAdRemover.start();
-          } else {
-            FluxFeatureAdRemover.stop();
-          }
+        case "removeads":
+          if (value) FluxFeatureAdRemover.start();
+          else FluxFeatureAdRemover.stop();
           break;
-        }
-        case "enableLogs": {
-          FluxLogger.info("Settings", `Log setting changed to ${String(value)} \u2014 re-initializing logger`);
+        case "enableLogs":
+          FluxLogger.info("Settings", `Log setting changed to ${String(value)}`);
           FluxLogger.init();
-          if (value) {
-            FluxLogger.info("Settings", "Debug logging is now enabled");
-          }
           break;
-        }
         default:
-          FluxLogger.debug("Settings", `Setting "${key}" changed to ${String(value)} \u2014 no real-time handler needed`);
           break;
       }
     }
     __name(applySettingChange, "applySettingChange");
     function toggleRow(key, label, desc) {
       const checked = FluxStorage.getBool(key, false);
-      return '<label class="ff-toggle-wrapper"><input type="checkbox" class="ff-toggle-input" data-key="' + key + '"' + (checked ? " checked" : "") + '><span class="ff-toggle-track"><span class="ff-toggle-knob"></span></span><span class="ff-toggle-label">' + label + '<br><small style="color:#888">' + desc + "</small></span></label>";
+      return `<label class="ff-toggle-wrapper"><input type="checkbox" class="ff-toggle-input" data-key="${key}"${checked ? " checked" : ""}><span class="ff-toggle-track"><span class="ff-toggle-knob"></span></span><span class="ff-toggle-label">${label}<br><small style="color:#888">${desc}</small></span></label>`;
     }
     __name(toggleRow, "toggleRow");
     return { open };

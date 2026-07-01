@@ -1,3 +1,108 @@
+/* === Segmented Pill Navigation === */
+.ff-segmented-nav {
+    display: flex;
+    position: relative;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 100px;
+    padding: 4px;
+    gap: 2px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+    z-index: 1;
+}
+
+.ff-segmented-nav::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 100px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.ff-segmented-item {
+    position: relative;
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.55);
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.25s ease;
+    z-index: 2;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+}
+
+.ff-segmented-item:hover {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.ff-segmented-item.ff-active {
+    color: #fff;
+    font-weight: 600;
+    text-shadow: 0 0 12px rgba(108, 92, 231, 0.3);
+}
+
+/* Animated pill indicator */
+.ff-segmented-indicator {
+    position: absolute;
+    top: 4px;
+    height: calc(100% - 8px);
+    border-radius: 100px;
+    background: var(--ff-accent);
+    z-index: 1;
+    transition: left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 2px 12px rgba(108, 92, 231, 0.4), 0 0 20px rgba(108, 92, 231, 0.2);
+    pointer-events: none;
+}
+
+/* Glossy shine sweep on the active pill */
+.ff-segmented-indicator::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -75%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.25) 50%, transparent 100%);
+    border-radius: 100px;
+    animation: ff-shine-sweep 1.8s ease-in-out infinite;
+}
+
+@keyframes ff-shine-sweep {
+    0% { left: -75%; opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { left: 125%; opacity: 0; }
+}
+
+/* Tab content fade + slide transition */
+.ff-settings-tab-content {
+    animation: ff-tab-fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ff-tab-fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+        filter: blur(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
 /* === Floating Settings Button === */
 #fluxfind-settings-btn {
     position: fixed; bottom: 20px; right: 20px; z-index: 99999;
