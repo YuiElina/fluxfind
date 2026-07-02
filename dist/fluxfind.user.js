@@ -389,6 +389,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
     transition: left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
     box-shadow: 0 2px 12px rgba(108, 92, 231, 0.4), 0 0 20px rgba(108, 92, 231, 0.2);
     pointer-events: none;
+    overflow: hidden;
 }
 
 /* Glossy shine sweep on the active pill */
