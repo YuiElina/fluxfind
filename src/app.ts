@@ -7,6 +7,7 @@ import { FluxRouter } from './features/url-router';
 import { FluxSettingsPanel } from './ui/settings-panel';
 import { FluxFeatureAdRemover } from './features/ad-remover';
 import { FluxFeatureServerBrowser } from './features/server-browser';
+import { FluxFeatureSmartSearch } from './features/smart-search';
 
 type PageHandler = 'servers' | 'game' | 'home' | 'profile' | 'search' | 'unknown';
 
@@ -38,6 +39,7 @@ export const FluxApp = ((): { init: () => void } => {
     });
 
     FluxFeatureAdRemover.start();
+    FluxFeatureSmartSearch.start();
     applyStoredSettings();
     scheduleServerBrowser();
 
@@ -51,19 +53,8 @@ export const FluxApp = ((): { init: () => void } => {
       document.body.style.setProperty('background-color', 'var(--ff-bg-primary)', 'important');
     }
     if (FluxStorage.getBool('disablechat', false)) {
-      // Chat container may not be in DOM yet — retry up to 5 times
-      let attempts = 0;
-      const tryHideChat = (): void => {
-        const chatContainer = document.querySelector('#chat-container, .chat-main, [class*="chat"]');
-        if (chatContainer instanceof HTMLElement) {
-          chatContainer.style.display = 'none';
-          FluxLogger.debug('App', 'Chat hidden on page load');
-        } else if (attempts < 5) {
-          attempts++;
-          setTimeout(tryHideChat, 1000);
-        }
-      };
-      tryHideChat();
+      GM_addStyle('#chat-container, .chat-main, [class*="chat-container"], [data-testid*="chat"] { display: none !important; }');
+      FluxLogger.debug('App', 'Chat hidden via CSS injection');
     }
     if (FluxStorage.getBool('removeads', true)) {
       FluxFeatureAdRemover.start();

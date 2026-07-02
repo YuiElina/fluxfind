@@ -2900,6 +2900,130 @@ GM_addStyle(`/* === CSS Custom Properties === */
     return { init, destroy };
   })();
 
+  // src/features/smart-search.ts
+  init_logger();
+  var CATEGORIES = [
+    { key: "games", label: "Games", icon: "gamepad", href: /* @__PURE__ */ __name((q) => `/discover/?Keyword=${encodeURIComponent(q)}`, "href") },
+    { key: "people", label: "People", icon: "user", href: /* @__PURE__ */ __name((q) => `/search/users?keyword=${encodeURIComponent(q)}`, "href") },
+    { key: "marketplace", label: "Marketplace", icon: "shopping-bag", href: /* @__PURE__ */ __name((q) => `/catalog?CatalogContext=1&Keyword=${encodeURIComponent(q)}`, "href") },
+    { key: "communities", label: "Groups", icon: "users", href: /* @__PURE__ */ __name((q) => `/search/communities?keyword=${encodeURIComponent(q)}`, "href") },
+    { key: "creator-store", label: "Creator Store", icon: "package", href: /* @__PURE__ */ __name((q) => `https://create.roblox.com/store/models?keyword=${encodeURIComponent(q)}`, "href") }
+  ];
+  function createShoppingBag() {
+    return FluxIcons.get("shopping-bag", { size: 14 }) || `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" x2="21" y1="6" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>`;
+  }
+  __name(createShoppingBag, "createShoppingBag");
+  var FluxFeatureSmartSearch = /* @__PURE__ */ (() => {
+    let overlay = null;
+    let dropdown = null;
+    let inputObserver = null;
+    let active = false;
+    function getSearchInput() {
+      return document.querySelector('#navbar-search-input, .navbar-search-input, input[placeholder*="Search"]');
+    }
+    __name(getSearchInput, "getSearchInput");
+    function hideRobloxDropdown() {
+      const robloxDropdown = document.querySelector(".dropdown-menu.new-dropdown-menu");
+      if (robloxDropdown instanceof HTMLElement) {
+        robloxDropdown.style.display = "none";
+      }
+    }
+    __name(hideRobloxDropdown, "hideRobloxDropdown");
+    function showOverlay(query) {
+      if (!overlay || !dropdown) return;
+      const rows = CATEGORIES.map((cat) => {
+        const icon = cat.key === "marketplace" ? createShoppingBag() : FluxIcons.get(cat.icon, { size: 14 });
+        return `<a href="${cat.href(query)}" class="ff-search-item" data-cat="${cat.key}">
+        <span class="ff-search-item-icon">${icon}</span>
+        <span class="ff-search-item-text">${query}</span>
+        <span class="ff-search-item-suffix">in ${cat.label}</span>
+      </a>`;
+      }).join("");
+      dropdown.innerHTML = `
+      <div class="ff-search-dropdown">
+        <div class="ff-search-header">Search results for "<strong>${query}</strong>"</div>
+        <div class="ff-search-items">${rows}</div>
+      </div>`;
+      overlay.style.display = "flex";
+    }
+    __name(showOverlay, "showOverlay");
+    function hideOverlay() {
+      if (overlay) overlay.style.display = "none";
+    }
+    __name(hideOverlay, "hideOverlay");
+    function createUI() {
+      overlay = document.createElement("div");
+      overlay.id = "ff-search-overlay";
+      overlay.style.cssText = "position:fixed;inset:0;z-index:10000;display:none;flex-direction:column;align-items:center;padding-top:80px;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);";
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) hideOverlay();
+      });
+      dropdown = document.createElement("div");
+      dropdown.className = "ff-search-container";
+      overlay.appendChild(dropdown);
+      document.body.appendChild(overlay);
+    }
+    __name(createUI, "createUI");
+    function start() {
+      if (active) return;
+      if (!FluxStorage.getBool("smartsearch", true)) {
+        FluxLogger.info("SmartSearch", "Disabled in settings, skipping");
+        return;
+      }
+      FluxLogger.info("SmartSearch", "Starting smart search");
+      createUI();
+      active = true;
+      const input = getSearchInput();
+      if (!input) {
+        FluxLogger.warn("SmartSearch", "Search input not found");
+        return;
+      }
+      let debounceTimer = null;
+      input.addEventListener("input", () => {
+        hideRobloxDropdown();
+        const query = input.value.trim();
+        if (debounceTimer) clearTimeout(debounceTimer);
+        if (query.length === 0) {
+          hideOverlay();
+          return;
+        }
+        debounceTimer = setTimeout(() => {
+          showOverlay(query);
+        }, 200);
+      });
+      input.addEventListener("focus", () => {
+        hideRobloxDropdown();
+        const query = input.value.trim();
+        if (query.length > 0) showOverlay(query);
+      });
+      inputObserver = new MutationObserver(() => {
+        hideRobloxDropdown();
+      });
+      const robloxDropdown = document.querySelector(".dropdown-menu.new-dropdown-menu");
+      if (robloxDropdown) {
+        inputObserver.observe(robloxDropdown, { attributes: true, attributeFilter: ["style", "class"] });
+      }
+      setInterval(hideRobloxDropdown, 200);
+    }
+    __name(start, "start");
+    function stop() {
+      if (!active) return;
+      FluxLogger.info("SmartSearch", "Stopping smart search");
+      active = false;
+      if (overlay) {
+        overlay.remove();
+        overlay = null;
+        dropdown = null;
+      }
+      if (inputObserver) {
+        inputObserver.disconnect();
+        inputObserver = null;
+      }
+    }
+    __name(stop, "stop");
+    return { start, stop };
+  })();
+
   // src/app.ts
   var FluxApp = /* @__PURE__ */ (() => {
     let initialized = false;
@@ -2921,6 +3045,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
         }
       });
       FluxFeatureAdRemover.start();
+      FluxFeatureSmartSearch.start();
       applyStoredSettings();
       scheduleServerBrowser();
       FluxLogger.info("App", "FluxFind initialized successfully");
@@ -2932,18 +3057,8 @@ GM_addStyle(`/* === CSS Custom Properties === */
         document.body.style.setProperty("background-color", "var(--ff-bg-primary)", "important");
       }
       if (FluxStorage.getBool("disablechat", false)) {
-        let attempts = 0;
-        const tryHideChat = /* @__PURE__ */ __name(() => {
-          const chatContainer = document.querySelector('#chat-container, .chat-main, [class*="chat"]');
-          if (chatContainer instanceof HTMLElement) {
-            chatContainer.style.display = "none";
-            FluxLogger.debug("App", "Chat hidden on page load");
-          } else if (attempts < 5) {
-            attempts++;
-            setTimeout(tryHideChat, 1e3);
-          }
-        }, "tryHideChat");
-        tryHideChat();
+        GM_addStyle('#chat-container, .chat-main, [class*="chat-container"], [data-testid*="chat"] { display: none !important; }');
+        FluxLogger.debug("App", "Chat hidden via CSS injection");
       }
       if (FluxStorage.getBool("removeads", true)) {
         FluxFeatureAdRemover.start();
