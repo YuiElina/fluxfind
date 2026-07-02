@@ -2013,7 +2013,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
         const data = await FluxHttpClient.post(
           `${FluxConstants.API.JOIN_API}/join-game-instance`,
           { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: sid },
-          { headers: { "User-Agent": "Roblox/WinInet" }, retries: 0 }
+          { headers: { "User-Agent": "Roblox/WinInet" }, retries: 2 }
         );
         const js = data.joinScript && typeof data.joinScript === "object" ? data.joinScript : data;
         if (Object.keys(js).length === 0) {
@@ -2362,7 +2362,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
     }
     __name(getMaxServerCount, "getMaxServerCount");
     function getRegionScanCount() {
-      return Math.min(getMaxServerCount(), 100);
+      return Math.min(getMaxServerCount(), 50);
     }
     __name(getRegionScanCount, "getRegionScanCount");
     async function scanAndCacheRegions(force = false) {
@@ -2423,9 +2423,12 @@ GM_addStyle(`/* === CSS Custom Properties === */
             const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(chunk, false);
             let resolvedInChunk = 0;
             thumbs.forEach((t) => {
-              if (t.imageUrl && t.token) {
-                thumbnailMap.set(t.token, t.imageUrl);
-                resolvedInChunk++;
+              if (t.imageUrl && t.requestId) {
+                const parts = t.requestId.split(":");
+                if (parts.length >= 2 && parts[1] !== void 0) {
+                  thumbnailMap.set(parts[1], t.imageUrl);
+                  resolvedInChunk++;
+                }
               }
             });
             FluxLogger.debug("ServerBrowser", `Thumbnail batch ${String(i + 1)}/${String(chunks.length)}: ${String(resolvedInChunk)} resolved out of ${String(chunk.length)} tokens`);

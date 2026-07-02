@@ -37,7 +37,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
   }
 
   function getRegionScanCount(): number {
-    return Math.min(getMaxServerCount(), 100);
+    return Math.min(getMaxServerCount(), 50);
   }
 
   async function scanAndCacheRegions(force = false): Promise<void> {
@@ -99,9 +99,12 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
           const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(chunk, false);
           let resolvedInChunk = 0;
           thumbs.forEach(t => {
-            if (t.imageUrl && t.token) {
-              thumbnailMap.set(t.token, t.imageUrl);
-              resolvedInChunk++;
+            if (t.imageUrl && t.requestId) {
+              const parts = t.requestId.split(':');
+              if (parts.length >= 2 && parts[1] !== undefined) {
+                thumbnailMap.set(parts[1], t.imageUrl);
+                resolvedInChunk++;
+              }
             }
           });
           FluxLogger.debug('ServerBrowser', `Thumbnail batch ${String(i + 1)}/${String(chunks.length)}: ${String(resolvedInChunk)} resolved out of ${String(chunk.length)} tokens`);

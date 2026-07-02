@@ -44,7 +44,7 @@ export const FluxGamesAPI = ((): {
       const data = await FluxHttpClient.post(
         `${FluxConstants.API.JOIN_API}/join-game-instance`,
         { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: sid },
-        { headers: { 'User-Agent': 'Roblox/WinInet' }, retries: 0 }
+        { headers: { 'User-Agent': 'Roblox/WinInet' }, retries: 2 }
       ) as Record<string, unknown>;
 
       const js: Record<string, unknown> = (data.joinScript && typeof data.joinScript === 'object') ? data.joinScript as Record<string, unknown> : data;
