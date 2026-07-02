@@ -38,9 +38,36 @@ export const FluxApp = ((): { init: () => void } => {
     });
 
     FluxFeatureAdRemover.start();
+    applyStoredSettings();
     scheduleServerBrowser();
 
     FluxLogger.info('App', 'FluxFind initialized successfully');
+  }
+
+  function applyStoredSettings(): void {
+    // Re-apply settings that require DOM changes on page load
+    if (FluxStorage.getBool('forcedarkmode', false)) {
+      document.documentElement.classList.add('ff-dark-mode');
+      document.body.style.setProperty('background-color', 'var(--ff-bg-primary)', 'important');
+    }
+    if (FluxStorage.getBool('disablechat', false)) {
+      // Chat container may not be in DOM yet — retry up to 5 times
+      let attempts = 0;
+      const tryHideChat = (): void => {
+        const chatContainer = document.querySelector('#chat-container, .chat-main, [class*="chat"]');
+        if (chatContainer instanceof HTMLElement) {
+          chatContainer.style.display = 'none';
+          FluxLogger.debug('App', 'Chat hidden on page load');
+        } else if (attempts < 5) {
+          attempts++;
+          setTimeout(tryHideChat, 1000);
+        }
+      };
+      tryHideChat();
+    }
+    if (FluxStorage.getBool('removeads', true)) {
+      FluxFeatureAdRemover.start();
+    }
   }
 
   function injectCoreStyles(): void {

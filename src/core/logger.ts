@@ -1,6 +1,6 @@
 import type { LogLevel } from '../types/storage';
 
-type LoggerModule = 'App' | 'Thumbnails' | 'GamesAPI' | 'Geolocation' | 'ServerBrowser' | 'RegionFilter' | 'AdRemover' | 'Settings' | 'Router' | 'HTTP' | 'General';
+type LoggerModule = 'App' | 'Thumbnails' | 'GamesAPI' | 'Geolocation' | 'ServerBrowser' | 'RegionFilter' | 'AdRemover' | 'Settings' | 'Router' | 'HTTP' | 'SmartSearch' | 'General';
 
 const timers = new Map<string, number>();
 

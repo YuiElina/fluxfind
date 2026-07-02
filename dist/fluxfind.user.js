@@ -2921,10 +2921,35 @@ GM_addStyle(`/* === CSS Custom Properties === */
         }
       });
       FluxFeatureAdRemover.start();
+      applyStoredSettings();
       scheduleServerBrowser();
       FluxLogger.info("App", "FluxFind initialized successfully");
     }
     __name(init, "init");
+    function applyStoredSettings() {
+      if (FluxStorage.getBool("forcedarkmode", false)) {
+        document.documentElement.classList.add("ff-dark-mode");
+        document.body.style.setProperty("background-color", "var(--ff-bg-primary)", "important");
+      }
+      if (FluxStorage.getBool("disablechat", false)) {
+        let attempts = 0;
+        const tryHideChat = /* @__PURE__ */ __name(() => {
+          const chatContainer = document.querySelector('#chat-container, .chat-main, [class*="chat"]');
+          if (chatContainer instanceof HTMLElement) {
+            chatContainer.style.display = "none";
+            FluxLogger.debug("App", "Chat hidden on page load");
+          } else if (attempts < 5) {
+            attempts++;
+            setTimeout(tryHideChat, 1e3);
+          }
+        }, "tryHideChat");
+        tryHideChat();
+      }
+      if (FluxStorage.getBool("removeads", true)) {
+        FluxFeatureAdRemover.start();
+      }
+    }
+    __name(applyStoredSettings, "applyStoredSettings");
     function injectCoreStyles() {
       const css = `/* FLUXFIND_CSS_PLACEHOLDER */`;
       GM_addStyle(css);
