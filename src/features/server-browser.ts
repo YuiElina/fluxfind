@@ -2,7 +2,7 @@ import { FluxDOM } from '../core/dom';
 import { FluxIcons } from '../ui/icons';
 import { FluxUtils } from '../core/utils';
 import { FluxLogger } from '../core/logger';
-import { FluxStorage } from '../core/storage';
+import { serverFiltersAtom, autoRegionScanAtom, regionFilterAtom, serverFetchCountAtom } from '../state/atoms';
 import { FluxConstants } from '../config/constants';
 import { FluxGamesAPI } from '../api/games';
 import { FluxNotifications } from '../ui/notifications';
@@ -30,10 +30,9 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
   let currentGameId = 0;
 
   function getMaxServerCount(): number {
-    const fromStorage = FluxStorage.getNumber('serverfetchcount', 0);
-    if (fromStorage > 0) return fromStorage;
-    const defaultCount = FluxStorage.getNumber('autoserverregionnumber', 50);
-    return defaultCount > 0 ? defaultCount : 50;
+    const fromAtom = serverFetchCountAtom.get();
+    if (fromAtom > 0) return fromAtom;
+    return 50;
   }
 
   async function scanAndCacheRegions(force = false): Promise<void> {
@@ -46,7 +45,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
     if (serverObserver) { serverObserver.disconnect(); serverObserver = null; }
 
-    const targetCountry = FluxStorage.get('serverregionfilter') ?? '';
+    const targetCountry = regionFilterAtom.get();
     const targetGroup = targetCountry ? FluxConstants.getCountryGroup(targetCountry) : null;
     const MIN_MATCHES = 10;
     const MAX_PAGES = 3;
@@ -195,7 +194,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
     regionScanDone = true;
 
-    const savedRegion = FluxStorage.get('serverregionfilter');
+    const savedRegion = regionFilterAtom.get();
     if (savedRegion) {
       FluxLogger.info('ServerBrowser', `Applying saved region filter: "${savedRegion}"`);
       applyRegionFilter(savedRegion);
@@ -322,7 +321,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
   }
 
   function applyRegionFilter(countryCode: string): void {
-    FluxStorage.set('serverregionfilter', countryCode);
+    regionFilterAtom.set(countryCode);
 
     if (!countryCode) {
       FluxLogger.info('ServerBrowser', 'Region filter cleared — showing all servers unsorted');
@@ -413,7 +412,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
   function openFilterPanel(): void {
     FluxModals.custom((modal, close) => {
-      const currentCc = FluxStorage.get('serverregionfilter') ?? '';
+      const currentCc = regionFilterAtom.get();
       const currentCount = getMaxServerCount();
       const countOptions = [30, 50, 100, 200, 300];
 
@@ -470,11 +469,11 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
         const countChanged = selectedCount !== currentCount;
         if (countChanged) {
-          FluxStorage.set('serverfetchcount', selectedCount);
+          serverFetchCountAtom.set(selectedCount);
         }
 
         // Always persist the region choice, then trigger a full refresh
-        FluxStorage.set('serverregionfilter', selectedCc);
+        regionFilterAtom.set(selectedCc);
         close();
         refreshServers();
       });
@@ -515,7 +514,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
   async function init(): Promise<void> {
     if (loaded) return;
-    if (!FluxStorage.getBool('togglefilterserversbutton', true)) {
+    if (!serverFiltersAtom.get()) {
       FluxLogger.info('ServerBrowser', 'Init skipped: feature disabled in settings');
       return;
     }
@@ -537,7 +536,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     FluxLogger.info('ServerBrowser', 'Server container found, injecting UI');
     injectFilterButtons();
     observeServerList();
-    if (FluxStorage.getBool('autoserverregions', true)) {
+    if (autoRegionScanAtom.get()) {
       FluxLogger.info('ServerBrowser', 'Auto region scan enabled, starting scan');
       void scanAndCacheRegions();
     } else {

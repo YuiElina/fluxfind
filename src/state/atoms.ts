@@ -15,3 +15,5 @@ export const autoRegionScanAtom: Atom<boolean> = createAtom('autoserverregions',
 export const responsiveCardsAtom: Atom<boolean> = createAtom('responsivegamecards', true);
 export const smartSearchAtom: Atom<boolean> = createAtom('smartsearch', true);
 export const debugLogsAtom: Atom<boolean> = createAtom('enableLogs', false);
+export const regionFilterAtom: Atom<string> = createAtom('serverregionfilter', '');
+export const serverFetchCountAtom: Atom<number> = createAtom('serverfetchcount', 50);

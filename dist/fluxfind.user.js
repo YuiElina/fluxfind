@@ -1856,6 +1856,8 @@ GM_addStyle(`/* === CSS Custom Properties === */
   var responsiveCardsAtom = createAtom("responsivegamecards", true);
   var smartSearchAtom = createAtom("smartsearch", true);
   var debugLogsAtom = createAtom("enableLogs", false);
+  var regionFilterAtom = createAtom("serverregionfilter", "");
+  var serverFetchCountAtom = createAtom("serverfetchcount", 50);
 
   // src/ui/settings-panel.ts
   var TABS = [
@@ -2461,10 +2463,9 @@ GM_addStyle(`/* === CSS Custom Properties === */
     let regionScanDone = false;
     let currentGameId = 0;
     function getMaxServerCount() {
-      const fromStorage = FluxStorage.getNumber("serverfetchcount", 0);
-      if (fromStorage > 0) return fromStorage;
-      const defaultCount = FluxStorage.getNumber("autoserverregionnumber", 50);
-      return defaultCount > 0 ? defaultCount : 50;
+      const fromAtom = serverFetchCountAtom.get();
+      if (fromAtom > 0) return fromAtom;
+      return 50;
     }
     __name(getMaxServerCount, "getMaxServerCount");
     async function scanAndCacheRegions(force = false) {
@@ -2478,7 +2479,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
         serverObserver.disconnect();
         serverObserver = null;
       }
-      const targetCountry = FluxStorage.get("serverregionfilter") ?? "";
+      const targetCountry = regionFilterAtom.get();
       const targetGroup = targetCountry ? FluxConstants.getCountryGroup(targetCountry) : null;
       const MIN_MATCHES = 10;
       const MAX_PAGES = 3;
@@ -2614,7 +2615,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
       const withoutRegion = allServers.length - withRegion;
       FluxLogger.info("ServerBrowser", `Servers ready: ${String(allServers.length)} total (${String(withRegion)} with region, ${String(withoutRegion)} without)`);
       regionScanDone = true;
-      const savedRegion = FluxStorage.get("serverregionfilter");
+      const savedRegion = regionFilterAtom.get();
       if (savedRegion) {
         FluxLogger.info("ServerBrowser", `Applying saved region filter: "${savedRegion}"`);
         applyRegionFilter(savedRegion);
@@ -2731,7 +2732,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
     }
     __name(createServerCard, "createServerCard");
     function applyRegionFilter(countryCode) {
-      FluxStorage.set("serverregionfilter", countryCode);
+      regionFilterAtom.set(countryCode);
       if (!countryCode) {
         FluxLogger.info("ServerBrowser", "Region filter cleared \u2014 showing all servers unsorted");
         renderServerCards(allServers);
@@ -2809,7 +2810,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
     __name(refreshServers, "refreshServers");
     function openFilterPanel() {
       FluxModals.custom((modal, close) => {
-        const currentCc = FluxStorage.get("serverregionfilter") ?? "";
+        const currentCc = regionFilterAtom.get();
         const currentCount = getMaxServerCount();
         const countOptions = [30, 50, 100, 200, 300];
         let groupsHTML = "";
@@ -2854,9 +2855,9 @@ GM_addStyle(`/* === CSS Custom Properties === */
           FluxLogger.info("ServerBrowser", `Filter applied: region="${selectedCc}", maxServers=${String(selectedCount)}`);
           const countChanged = selectedCount !== currentCount;
           if (countChanged) {
-            FluxStorage.set("serverfetchcount", selectedCount);
+            serverFetchCountAtom.set(selectedCount);
           }
-          FluxStorage.set("serverregionfilter", selectedCc);
+          regionFilterAtom.set(selectedCc);
           close();
           refreshServers();
         });
@@ -2900,7 +2901,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
     __name(observeServerList, "observeServerList");
     async function init() {
       if (loaded) return;
-      if (!FluxStorage.getBool("togglefilterserversbutton", true)) {
+      if (!serverFiltersAtom.get()) {
         FluxLogger.info("ServerBrowser", "Init skipped: feature disabled in settings");
         return;
       }
@@ -2919,7 +2920,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
       FluxLogger.info("ServerBrowser", "Server container found, injecting UI");
       injectFilterButtons();
       observeServerList();
-      if (FluxStorage.getBool("autoserverregions", true)) {
+      if (autoRegionScanAtom.get()) {
         FluxLogger.info("ServerBrowser", "Auto region scan enabled, starting scan");
         void scanAndCacheRegions();
       } else {
