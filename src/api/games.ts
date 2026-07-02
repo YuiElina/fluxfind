@@ -18,15 +18,15 @@ export const FluxGamesAPI = ((): {
     return m?.[1] !== undefined ? FluxSanitizer.sanitizeUserId(m[1]) : 0;
   }
 
-  async function fetchAllPublicServers(gameId: number, sortOrder = 'Asc', maxServers = 300): Promise<ServerEntry[]> {
+  async function fetchAllPublicServers(gameId: number, sortOrder = 'Desc', maxServers = 300): Promise<ServerEntry[]> {
     let allData: ServerEntry[] = [];
     let cursor: string | null = null;
     let page = 0;
 
-    FluxLogger.info('GamesAPI', `Fetching servers for game ${String(gameId)} (max: ${String(maxServers)})`);
+    FluxLogger.info('GamesAPI', `Fetching servers for game ${String(gameId)} (max: ${String(maxServers)}, sort: ${sortOrder})`);
 
     do {
-      const url = `${FluxConstants.API.GAMES_API}/games/${String(gameId)}/servers/Public?sortOrder=${sortOrder}&limit=100${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`;
+      const url = `${FluxConstants.API.GAMES_API}/games/${String(gameId)}/servers/Public?sortOrder=${sortOrder}&limit=100&excludeFullGames=true${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`;
       const resp = await FluxHttpClient.get(url, {}, { cache: false }) as { data?: unknown; nextPageCursor?: string };
       const servers = (resp.data ?? []) as ServerEntry[];
       allData = allData.concat(servers);

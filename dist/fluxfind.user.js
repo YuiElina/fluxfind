@@ -1990,13 +1990,13 @@ GM_addStyle(`/* === CSS Custom Properties === */
       return m?.[1] !== void 0 ? FluxSanitizer.sanitizeUserId(m[1]) : 0;
     }
     __name(getCurrentGameId, "getCurrentGameId");
-    async function fetchAllPublicServers(gameId, sortOrder = "Asc", maxServers = 300) {
+    async function fetchAllPublicServers(gameId, sortOrder = "Desc", maxServers = 300) {
       let allData = [];
       let cursor = null;
       let page = 0;
-      FluxLogger.info("GamesAPI", `Fetching servers for game ${String(gameId)} (max: ${String(maxServers)})`);
+      FluxLogger.info("GamesAPI", `Fetching servers for game ${String(gameId)} (max: ${String(maxServers)}, sort: ${sortOrder})`);
       do {
-        const url = `${FluxConstants.API.GAMES_API}/games/${String(gameId)}/servers/Public?sortOrder=${sortOrder}&limit=100${cursor ? "&cursor=" + encodeURIComponent(cursor) : ""}`;
+        const url = `${FluxConstants.API.GAMES_API}/games/${String(gameId)}/servers/Public?sortOrder=${sortOrder}&limit=100&excludeFullGames=true${cursor ? "&cursor=" + encodeURIComponent(cursor) : ""}`;
         const resp = await FluxHttpClient.get(url, {}, { cache: false });
         const servers = resp.data ?? [];
         allData = allData.concat(servers);
