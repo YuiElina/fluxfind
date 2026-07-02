@@ -3,6 +3,7 @@ import { FluxStorage } from '../core/storage';
 import { FluxModals } from './modals';
 import { FluxLogger } from '../core/logger';
 import { FluxFeatureAdRemover } from '../features/ad-remover';
+import { darkModeAtom, chatDisabledAtom, removeAdsAtom, debugLogsAtom, smartSearchAtom } from '../state/atoms';
 
 type SettingsTab = 'filters' | 'appearance' | 'privacy' | 'ads';
 
@@ -113,7 +114,6 @@ export const FluxSettingsPanel = ((): { open: () => void } => {
           <div id="ff-nav-container"></div>
           <div id="ff-content-container" style="flex:1;overflow-y:auto"></div>
         </div>`;
-
       const navContainer = modal.querySelector('#ff-nav-container');
       const contentContainer = modal.querySelector('#ff-content-container');
 
@@ -146,28 +146,22 @@ export const FluxSettingsPanel = ((): { open: () => void } => {
   }
 
   function applySettingChange(key: string, value: boolean): void {
+    FluxLogger.info('Settings', `Toggle changed: ${key} = ${String(value)}`);
     switch (key) {
       case 'forcedarkmode':
-        if (value) {
-          document.documentElement.classList.add('ff-dark-mode');
-          document.body.style.setProperty('background-color', 'var(--ff-bg-primary)', 'important');
-        } else {
-          document.documentElement.classList.remove('ff-dark-mode');
-          document.body.style.removeProperty('background-color');
-        }
+        darkModeAtom.set(value);
         break;
-      case 'disablechat': {
-        const chatContainer = document.querySelector('#chat-container, .chat-main, [class*="chat"]');
-        if (chatContainer instanceof HTMLElement) chatContainer.style.display = value ? 'none' : '';
+      case 'disablechat':
+        chatDisabledAtom.set(value);
         break;
-      }
       case 'removeads':
-        if (value) FluxFeatureAdRemover.start();
-        else FluxFeatureAdRemover.stop();
+        removeAdsAtom.set(value);
         break;
       case 'enableLogs':
-        FluxLogger.info('Settings', `Log setting changed to ${String(value)}`);
-        FluxLogger.init();
+        debugLogsAtom.set(value);
+        break;
+      case 'smartsearch':
+        smartSearchAtom.set(value);
         break;
       default:
         break;

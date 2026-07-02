@@ -8,6 +8,7 @@ import { FluxSettingsPanel } from './ui/settings-panel';
 import { FluxFeatureAdRemover } from './features/ad-remover';
 import { FluxFeatureServerBrowser } from './features/server-browser';
 import { FluxFeatureSmartSearch } from './features/smart-search';
+import { darkModeAtom, chatDisabledAtom, removeAdsAtom, smartSearchAtom, debugLogsAtom } from './state/atoms';
 
 type PageHandler = 'servers' | 'game' | 'home' | 'profile' | 'search' | 'unknown';
 
@@ -24,9 +25,7 @@ export const FluxApp = ((): { init: () => void } => {
     FluxStorage.migrateLegacy();
     FluxStorage.initDefaults(FluxConstants.DEFAULT_SETTINGS);
 
-    // Inject core CSS via GM_addStyle
     injectCoreStyles();
-
     injectSettingsButton();
 
     FluxRouter.start((newPage: PageHandler) => {
@@ -38,32 +37,67 @@ export const FluxApp = ((): { init: () => void } => {
       }
     });
 
-    FluxFeatureAdRemover.start();
-    FluxFeatureSmartSearch.start();
-    applyStoredSettings();
+    // Reactive state subscriptions
+    darkModeAtom.subscribe((v) => {
+      if (v) {
+        document.documentElement.classList.add('ff-dark-mode');
+        document.body.style.setProperty('background-color', 'var(--ff-bg-primary)', 'important');
+      } else {
+        document.documentElement.classList.remove('ff-dark-mode');
+        document.body.style.removeProperty('background-color');
+      }
+    });
+
+    chatDisabledAtom.subscribe((v) => {
+      if (v) {
+        if (!document.getElementById('ff-disable-chat')) {
+          const style = document.createElement('style');
+          style.id = 'ff-disable-chat';
+          style.textContent = '#chat-container, .chat-main, [class*="chat-container"], [data-testid*="chat"] { display: none !important; }';
+          document.head.appendChild(style);
+        }
+      } else {
+        document.getElementById('ff-disable-chat')?.remove();
+      }
+    });
+
+    removeAdsAtom.subscribe((v) => {
+      if (v) FluxFeatureAdRemover.start();
+      else FluxFeatureAdRemover.stop();
+    });
+
+    smartSearchAtom.subscribe((v) => {
+      if (v) FluxFeatureSmartSearch.start();
+      else FluxFeatureSmartSearch.stop();
+    });
+
+    debugLogsAtom.subscribe((_v) => {
+      FluxLogger.init(); // re-init logger with updated settings
+    });
+
+    // Apply initial state
+    applyInitialSettings();
     scheduleServerBrowser();
 
     FluxLogger.info('App', 'FluxFind initialized successfully');
   }
 
-  function applyStoredSettings(): void {
-    // Re-apply settings that require DOM changes on page load
-    if (FluxStorage.getBool('forcedarkmode', false)) {
+  function applyInitialSettings(): void {
+    if (darkModeAtom.get()) {
       document.documentElement.classList.add('ff-dark-mode');
       document.body.style.setProperty('background-color', 'var(--ff-bg-primary)', 'important');
     }
-    if (FluxStorage.getBool('disablechat', false)) {
-      GM_addStyle('#chat-container, .chat-main, [class*="chat-container"], [data-testid*="chat"] { display: none !important; }');
-      FluxLogger.debug('App', 'Chat hidden via CSS injection');
+    if (chatDisabledAtom.get()) {
+      const style = document.createElement('style');
+      style.id = 'ff-disable-chat';
+      style.textContent = '#chat-container, .chat-main, [class*="chat-container"], [data-testid*="chat"] { display: none !important; }';
+      document.head.appendChild(style);
     }
-    if (FluxStorage.getBool('removeads', true)) {
-      FluxFeatureAdRemover.start();
-    }
+    if (removeAdsAtom.get()) FluxFeatureAdRemover.start();
+    if (smartSearchAtom.get()) FluxFeatureSmartSearch.start();
   }
 
   function injectCoreStyles(): void {
-    // CSS is injected at build time by build.ts from src/ui/css/*.css files
-    // The placeholder below is replaced with actual CSS content during bundling
     const css = `/* FLUXFIND_CSS_PLACEHOLDER */`;
     GM_addStyle(css);
   }

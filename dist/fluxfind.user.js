@@ -1808,6 +1808,55 @@ GM_addStyle(`/* === CSS Custom Properties === */
     return { start, stop, removeAds, getStats, resetStats };
   })();
 
+  // src/core/state.ts
+  init_logger();
+  function createAtom(key, defaultValue) {
+    let value = defaultValue;
+    const raw = FluxStorage.get(key);
+    if (raw !== null) {
+      try {
+        value = JSON.parse(raw);
+      } catch {
+      }
+    }
+    const listeners = /* @__PURE__ */ new Set();
+    const atom = {
+      get() {
+        return value;
+      },
+      set(next) {
+        if (value === next) return;
+        value = next;
+        FluxStorage.setJSON(key, next);
+        listeners.forEach((fn) => {
+          try {
+            fn(next);
+          } catch (e) {
+            FluxLogger.error("StateManager", `Subscriber error: ${String(e)}`);
+          }
+        });
+      },
+      subscribe(fn) {
+        listeners.add(fn);
+        return () => {
+          listeners.delete(fn);
+        };
+      }
+    };
+    return atom;
+  }
+  __name(createAtom, "createAtom");
+
+  // src/state/atoms.ts
+  var darkModeAtom = createAtom("forcedarkmode", false);
+  var chatDisabledAtom = createAtom("disablechat", false);
+  var removeAdsAtom = createAtom("removeads", true);
+  var serverFiltersAtom = createAtom("togglefilterserversbutton", true);
+  var autoRegionScanAtom = createAtom("autoserverregions", true);
+  var responsiveCardsAtom = createAtom("responsivegamecards", true);
+  var smartSearchAtom = createAtom("smartsearch", true);
+  var debugLogsAtom = createAtom("enableLogs", false);
+
   // src/ui/settings-panel.ts
   var TABS = [
     { key: "filters", label: "Filters" },
@@ -1932,28 +1981,22 @@ GM_addStyle(`/* === CSS Custom Properties === */
     }
     __name(getTabHTML, "getTabHTML");
     function applySettingChange(key, value) {
+      FluxLogger.info("Settings", `Toggle changed: ${key} = ${String(value)}`);
       switch (key) {
         case "forcedarkmode":
-          if (value) {
-            document.documentElement.classList.add("ff-dark-mode");
-            document.body.style.setProperty("background-color", "var(--ff-bg-primary)", "important");
-          } else {
-            document.documentElement.classList.remove("ff-dark-mode");
-            document.body.style.removeProperty("background-color");
-          }
+          darkModeAtom.set(value);
           break;
-        case "disablechat": {
-          const chatContainer = document.querySelector('#chat-container, .chat-main, [class*="chat"]');
-          if (chatContainer instanceof HTMLElement) chatContainer.style.display = value ? "none" : "";
+        case "disablechat":
+          chatDisabledAtom.set(value);
           break;
-        }
         case "removeads":
-          if (value) FluxFeatureAdRemover.start();
-          else FluxFeatureAdRemover.stop();
+          removeAdsAtom.set(value);
           break;
         case "enableLogs":
-          FluxLogger.info("Settings", `Log setting changed to ${String(value)}`);
-          FluxLogger.init();
+          debugLogsAtom.set(value);
+          break;
+        case "smartsearch":
+          smartSearchAtom.set(value);
           break;
         default:
           break;
@@ -2902,22 +2945,21 @@ GM_addStyle(`/* === CSS Custom Properties === */
 
   // src/features/smart-search.ts
   init_logger();
-  var CATEGORIES = [
-    { key: "games", label: "Games", icon: "gamepad", href: /* @__PURE__ */ __name((q) => `/discover/?Keyword=${encodeURIComponent(q)}`, "href") },
-    { key: "people", label: "People", icon: "user", href: /* @__PURE__ */ __name((q) => `/search/users?keyword=${encodeURIComponent(q)}`, "href") },
-    { key: "marketplace", label: "Marketplace", icon: "shopping-bag", href: /* @__PURE__ */ __name((q) => `/catalog?CatalogContext=1&Keyword=${encodeURIComponent(q)}`, "href") },
-    { key: "communities", label: "Groups", icon: "users", href: /* @__PURE__ */ __name((q) => `/search/communities?keyword=${encodeURIComponent(q)}`, "href") },
-    { key: "creator-store", label: "Creator Store", icon: "package", href: /* @__PURE__ */ __name((q) => `https://create.roblox.com/store/models?keyword=${encodeURIComponent(q)}`, "href") }
-  ];
-  function createShoppingBag() {
-    return FluxIcons.get("shopping-bag", { size: 14 }) || `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" x2="21" y1="6" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>`;
-  }
-  __name(createShoppingBag, "createShoppingBag");
   var FluxFeatureSmartSearch = /* @__PURE__ */ (() => {
     let overlay = null;
     let dropdown = null;
-    let inputObserver = null;
     let active = false;
+    let activeTab = "games";
+    let searchTimer = null;
+    let abortController = null;
+    function uuid() {
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === "x" ? r : r & 3 | 8;
+        return v.toString(16);
+      });
+    }
+    __name(uuid, "uuid");
     function getSearchInput() {
       return document.querySelector('#navbar-search-input, .navbar-search-input, input[placeholder*="Search"]');
     }
@@ -2929,25 +2971,147 @@ GM_addStyle(`/* === CSS Custom Properties === */
       }
     }
     __name(hideRobloxDropdown, "hideRobloxDropdown");
-    function showOverlay(query) {
+    async function fetchGames(query) {
+      const sessionId = uuid();
+      try {
+        const resp = await fetch(`https://apis.roblox.com/search-api/omni-search?searchQuery=${encodeURIComponent(query)}&pageToken=&sessionId=${sessionId}&pageType=all`, {
+          credentials: "include"
+        });
+        if (!resp.ok) return [];
+        const data = await resp.json();
+        const gameGroup = (data.searchResults ?? []).find((g) => g.contentGroupType === "Game");
+        if (!gameGroup?.contents) return [];
+        const games = gameGroup.contents.slice(0, 8);
+        const iconBody = games.map((g) => ({
+          requestId: `${String(g.universeId)}::GameIcon:256x256:webp:regular:::false`,
+          type: "GameIcon",
+          targetId: g.universeId,
+          token: "",
+          format: "webp",
+          size: "256x256",
+          version: ""
+        }));
+        const iconResp = await fetch("https://thumbnails.roblox.com/v1/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(iconBody)
+        });
+        const iconData = await iconResp.json();
+        const iconMap = /* @__PURE__ */ new Map();
+        (iconData.data ?? []).forEach((r) => {
+          iconMap.set(r.targetId, r.imageUrl);
+        });
+        return games.map((g) => ({ ...g, imageUrl: iconMap.get(g.universeId) }));
+      } catch {
+        return [];
+      }
+    }
+    __name(fetchGames, "fetchGames");
+    async function fetchUsers(query) {
+      const sessionId = uuid();
+      try {
+        const resp = await fetch(`https://apis.roblox.com/search-api/omni-search?verticalType=user&searchQuery=${encodeURIComponent(query)}&pageToken=&globalSessionId=${sessionId}&sessionId=${sessionId}`, {
+          credentials: "include"
+        });
+        if (!resp.ok) return [];
+        const data = await resp.json();
+        const userGroup = (data.searchResults ?? []).find((g) => g.contentGroupType === "User");
+        if (!userGroup?.contents) return [];
+        const users = userGroup.contents.slice(0, 8);
+        const avatarBody = users.map((u) => ({
+          requestId: `${String(u.contentId)}:undefined:AvatarHeadshot:150x150:webp:regular:0::false`,
+          type: "AvatarHeadShot",
+          targetId: u.contentId,
+          format: "webp",
+          size: "150x150"
+        }));
+        const avatarResp = await fetch("https://thumbnails.roblox.com/v1/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(avatarBody)
+        });
+        const avatarData = await avatarResp.json();
+        const avatarMap = /* @__PURE__ */ new Map();
+        (avatarData.data ?? []).forEach((r) => {
+          avatarMap.set(r.targetId, r.imageUrl);
+        });
+        return users.map((u) => ({ userId: u.contentId, username: u.username, displayName: u.displayName, imageUrl: avatarMap.get(u.contentId) }));
+      } catch {
+        return [];
+      }
+    }
+    __name(fetchUsers, "fetchUsers");
+    function formatCount(n) {
+      if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+      if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+      return String(n);
+    }
+    __name(formatCount, "formatCount");
+    async function showResults(query, tab) {
       if (!overlay || !dropdown) return;
-      const rows = CATEGORIES.map((cat) => {
-        const icon = cat.key === "marketplace" ? createShoppingBag() : FluxIcons.get(cat.icon, { size: 14 });
-        return `<a href="${cat.href(query)}" class="ff-search-item" data-cat="${cat.key}">
-        <span class="ff-search-item-icon">${icon}</span>
-        <span class="ff-search-item-text">${query}</span>
-        <span class="ff-search-item-suffix">in ${cat.label}</span>
-      </a>`;
-      }).join("");
-      dropdown.innerHTML = `
-      <div class="ff-search-dropdown">
-        <div class="ff-search-header">Search results for "<strong>${query}</strong>"</div>
+      if (tab === "games") {
+        FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">Searching games for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"...</div><div class="ff-search-loading"><div class="ff-spinner"></div></div></div>`);
+        overlay.style.display = "flex";
+        const games = await fetchGames(query);
+        if (games.length === 0) {
+          FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">No games found for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"</div></div>`);
+          return;
+        }
+        const rows = games.map((g) => `<a href="/games/${String(g.rootPlaceId)}/" class="ff-search-result">
+        <img class="ff-search-thumb" src="${FluxSanitizer.sanitizeUrl(g.imageUrl ?? "")}" alt="" loading="lazy" onerror="this.style.display='none'" />
+        <div class="ff-search-info">
+          <span class="ff-search-name">${FluxSanitizer.escapeHtml(g.name)}</span>
+          <span class="ff-search-meta"><span class="ff-player-badge">${FluxIcons.get("user", { size: 12 })} ${formatCount(g.playerCount)}</span></span>
+        </div>
+      </a>`).join("");
+        dropdown.innerHTML = `<div class="ff-search-dropdown">
+        <div class="ff-search-tabs">
+          <span class="ff-search-tab ff-active" data-tab="games">${FluxIcons.get("gamepad", { size: 14 })} Games</span>
+          <span class="ff-search-tab" data-tab="people">${FluxIcons.get("user", { size: 14 })} People</span>
+        </div>
         <div class="ff-search-items">${rows}</div>
       </div>`;
+      } else {
+        FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">Searching people for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"...</div><div class="ff-search-loading"><div class="ff-spinner"></div></div></div>`);
+        const users = await fetchUsers(query);
+        if (users.length === 0) {
+          FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">No people found for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"</div></div>`);
+          return;
+        }
+        const rows = users.map((u) => `<a href="/users/${String(u.userId)}/profile" class="ff-search-result">
+        <img class="ff-search-thumb ff-search-avatar" src="${FluxSanitizer.sanitizeUrl(u.imageUrl ?? "")}" alt="" loading="lazy" onerror="this.style.display='none'" />
+        <div class="ff-search-info">
+          <span class="ff-search-name">${FluxSanitizer.escapeHtml(u.displayName)}</span>
+          <span class="ff-search-meta">@${FluxSanitizer.escapeHtml(u.username)}</span>
+        </div>
+      </a>`).join("");
+        dropdown.innerHTML = `<div class="ff-search-dropdown">
+        <div class="ff-search-tabs">
+          <span class="ff-search-tab" data-tab="games">${FluxIcons.get("gamepad", { size: 14 })} Games</span>
+          <span class="ff-search-tab ff-active" data-tab="people">${FluxIcons.get("user", { size: 14 })} People</span>
+        </div>
+        <div class="ff-search-items">${rows}</div>
+      </div>`;
+      }
+      dropdown.querySelectorAll(".ff-search-tab").forEach((tabEl) => {
+        tabEl.addEventListener("click", function() {
+          const newTab = this.dataset.tab;
+          if (!newTab) return;
+          activeTab = newTab;
+          const input = getSearchInput();
+          if (input) void showResults(input.value.trim(), activeTab);
+        });
+      });
       overlay.style.display = "flex";
     }
-    __name(showOverlay, "showOverlay");
+    __name(showResults, "showResults");
     function hideOverlay() {
+      if (abortController) {
+        abortController.abort();
+        abortController = null;
+      }
       if (overlay) overlay.style.display = "none";
     }
     __name(hideOverlay, "hideOverlay");
@@ -2966,7 +3130,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
     __name(createUI, "createUI");
     function start() {
       if (active) return;
-      if (!FluxStorage.getBool("smartsearch", true)) {
+      if (!smartSearchAtom.get()) {
         FluxLogger.info("SmartSearch", "Disabled in settings, skipping");
         return;
       }
@@ -2978,46 +3142,34 @@ GM_addStyle(`/* === CSS Custom Properties === */
         FluxLogger.warn("SmartSearch", "Search input not found");
         return;
       }
-      let debounceTimer = null;
       input.addEventListener("input", () => {
         hideRobloxDropdown();
         const query = input.value.trim();
-        if (debounceTimer) clearTimeout(debounceTimer);
+        if (searchTimer) clearTimeout(searchTimer);
         if (query.length === 0) {
           hideOverlay();
           return;
         }
-        debounceTimer = setTimeout(() => {
-          showOverlay(query);
-        }, 200);
+        searchTimer = setTimeout(() => void showResults(query, activeTab), 300);
       });
       input.addEventListener("focus", () => {
         hideRobloxDropdown();
         const query = input.value.trim();
-        if (query.length > 0) showOverlay(query);
+        if (query.length > 0) void showResults(query, activeTab);
       });
-      inputObserver = new MutationObserver(() => {
-        hideRobloxDropdown();
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") hideOverlay();
       });
-      const robloxDropdown = document.querySelector(".dropdown-menu.new-dropdown-menu");
-      if (robloxDropdown) {
-        inputObserver.observe(robloxDropdown, { attributes: true, attributeFilter: ["style", "class"] });
-      }
       setInterval(hideRobloxDropdown, 200);
     }
     __name(start, "start");
     function stop() {
       if (!active) return;
-      FluxLogger.info("SmartSearch", "Stopping smart search");
       active = false;
       if (overlay) {
         overlay.remove();
         overlay = null;
         dropdown = null;
-      }
-      if (inputObserver) {
-        inputObserver.disconnect();
-        inputObserver = null;
       }
     }
     __name(stop, "stop");
@@ -3044,27 +3196,58 @@ GM_addStyle(`/* === CSS Custom Properties === */
           });
         }
       });
-      FluxFeatureAdRemover.start();
-      FluxFeatureSmartSearch.start();
-      applyStoredSettings();
+      darkModeAtom.subscribe((v) => {
+        if (v) {
+          document.documentElement.classList.add("ff-dark-mode");
+          document.body.style.setProperty("background-color", "var(--ff-bg-primary)", "important");
+        } else {
+          document.documentElement.classList.remove("ff-dark-mode");
+          document.body.style.removeProperty("background-color");
+        }
+      });
+      chatDisabledAtom.subscribe((v) => {
+        if (v) {
+          if (!document.getElementById("ff-disable-chat")) {
+            const style = document.createElement("style");
+            style.id = "ff-disable-chat";
+            style.textContent = '#chat-container, .chat-main, [class*="chat-container"], [data-testid*="chat"] { display: none !important; }';
+            document.head.appendChild(style);
+          }
+        } else {
+          document.getElementById("ff-disable-chat")?.remove();
+        }
+      });
+      removeAdsAtom.subscribe((v) => {
+        if (v) FluxFeatureAdRemover.start();
+        else FluxFeatureAdRemover.stop();
+      });
+      smartSearchAtom.subscribe((v) => {
+        if (v) FluxFeatureSmartSearch.start();
+        else FluxFeatureSmartSearch.stop();
+      });
+      debugLogsAtom.subscribe((_v) => {
+        FluxLogger.init();
+      });
+      applyInitialSettings();
       scheduleServerBrowser();
       FluxLogger.info("App", "FluxFind initialized successfully");
     }
     __name(init, "init");
-    function applyStoredSettings() {
-      if (FluxStorage.getBool("forcedarkmode", false)) {
+    function applyInitialSettings() {
+      if (darkModeAtom.get()) {
         document.documentElement.classList.add("ff-dark-mode");
         document.body.style.setProperty("background-color", "var(--ff-bg-primary)", "important");
       }
-      if (FluxStorage.getBool("disablechat", false)) {
-        GM_addStyle('#chat-container, .chat-main, [class*="chat-container"], [data-testid*="chat"] { display: none !important; }');
-        FluxLogger.debug("App", "Chat hidden via CSS injection");
+      if (chatDisabledAtom.get()) {
+        const style = document.createElement("style");
+        style.id = "ff-disable-chat";
+        style.textContent = '#chat-container, .chat-main, [class*="chat-container"], [data-testid*="chat"] { display: none !important; }';
+        document.head.appendChild(style);
       }
-      if (FluxStorage.getBool("removeads", true)) {
-        FluxFeatureAdRemover.start();
-      }
+      if (removeAdsAtom.get()) FluxFeatureAdRemover.start();
+      if (smartSearchAtom.get()) FluxFeatureSmartSearch.start();
     }
-    __name(applyStoredSettings, "applyStoredSettings");
+    __name(applyInitialSettings, "applyInitialSettings");
     function injectCoreStyles() {
       const css = `/* FLUXFIND_CSS_PLACEHOLDER */`;
       GM_addStyle(css);

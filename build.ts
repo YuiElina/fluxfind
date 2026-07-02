@@ -158,7 +158,6 @@ async function build(): Promise<void> {
   const cssInjection = `GM_addStyle(\`${escapedCSS}\`);\n`;
 
   // Insert CSS injection right after the license, before esbuild's IIFE
-  // esbuild outputs: "use strict";\n(() => {\n...
   const strictMarker = '"use strict";';
   if (bundleContent.includes(strictMarker)) {
     bundleContent = bundleContent.replace(strictMarker, strictMarker + '\n' + cssInjection);
