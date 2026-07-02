@@ -16,7 +16,7 @@ export const FluxConstants = ((): {
 } => {
   'use strict';
 
-  const VERSION = '1.0.0' as const;
+  const VERSION = '0.1.0-alpha' as const;
 
   const API = {
     ROBLOX_BASE: 'https://www.roblox.com',
