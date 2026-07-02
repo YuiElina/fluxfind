@@ -206,6 +206,45 @@ GM_addStyle(`/* === CSS Custom Properties === */
     pointer-events: none;
 }
 
+/* === Toast Notifications === */
+@keyframes ff-slideIn  { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+@keyframes ff-slideOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100%); } }
+
+#fluxfind-toasts {
+    position: fixed; top: 20px; right: 20px; z-index: 999999999999;
+    display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+
+.ff-toast {
+    background: var(--ff-bg-secondary);
+    color: var(--ff-text-primary);
+    padding: 12px 16px;
+    border-radius: var(--ff-radius-md);
+    font: 500 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-width: 280px; max-width: 420px;
+    border: 1px solid var(--ff-border-light);
+    box-shadow: var(--ff-shadow);
+    animation: ff-slideIn 0.3s ease-out forwards;
+    pointer-events: auto; position: relative; overflow: hidden;
+}
+
+.ff-toast.removing { animation: ff-slideOut 0.3s ease-in forwards; }
+
+.ff-toast-content { display: flex; align-items: center; gap: 10px; }
+
+.ff-toast-icon { flex-shrink: 0; width: 18px; height: 18px; display: flex; align-items: center; }
+
+.ff-toast-message { flex: 1; line-height: 1.4; }
+
+.ff-toast-close {
+    position: absolute; top: 6px; right: 8px; width: 22px; height: 22px;
+    background: none; border: none; color: var(--ff-text-muted); cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; border-radius: var(--ff-radius-sm);
+    transition: background var(--ff-transition), color var(--ff-transition);
+}
+
+.ff-toast-close:hover { color: var(--ff-text-primary); background: var(--ff-bg-hover); }
+
 /* === Spinner & Skeleton === */
 .ff-spinner {
     display: inline-block; width: 16px; height: 16px;
@@ -2009,6 +2048,15 @@ GM_addStyle(`/* === CSS Custom Properties === */
       return allData;
     }
     __name(fetchAllPublicServers, "fetchAllPublicServers");
+    async function fetchPublicServersPage(gameId, sortOrder, limit, cursor = null) {
+      const url = `${FluxConstants.API.GAMES_API}/games/${String(gameId)}/servers/Public?sortOrder=${sortOrder}&limit=${String(limit)}&excludeFullGames=true${cursor ? "&cursor=" + encodeURIComponent(cursor) : ""}`;
+      const resp = await FluxHttpClient.get(url, {}, { cache: false });
+      return {
+        servers: resp.data ?? [],
+        nextCursor: resp.nextPageCursor ?? null
+      };
+    }
+    __name(fetchPublicServersPage, "fetchPublicServersPage");
     async function fetchSingleRegion(gameId, sid) {
       try {
         const data = await FluxHttpClient.post(
@@ -2017,11 +2065,13 @@ GM_addStyle(`/* === CSS Custom Properties === */
           { headers: { "User-Agent": "Roblox/WinInet" }, retries: 2 }
         );
         const js = data.joinScript && typeof data.joinScript === "object" ? data.joinScript : data;
+        const topKeys = Object.keys(js).join(", ");
+        FluxLogger.debug("GamesAPI", `Region [${sid}]: joinScript keys: [${topKeys}]`);
         if (Object.keys(js).length === 0) {
           FluxLogger.warn("GamesAPI", `Region [${sid}]: empty joinScript response`);
           return { sid, result: null };
         }
-        const endpoints = js.UdmuxEndpoints ?? js.udmuxEndpoints;
+        const endpoints = js.UdmuxEndpoints ?? js.udmuxEndpoints ?? js.udmuxendpoints ?? js.DirectEndpoint ?? js.ConnectionEndpoints;
         if (endpoints === void 0 || endpoints.length === 0) {
           FluxLogger.warn("GamesAPI", `Region [${sid}]: no UdmuxEndpoints in response`);
           return { sid, result: null };
@@ -2101,7 +2151,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
       return results;
     }
     __name(fetchServerRegions, "fetchServerRegions");
-    return { getCurrentGameId, fetchAllPublicServers, fetchServerRegions };
+    return { getCurrentGameId, fetchAllPublicServers, fetchPublicServersPage, fetchServerRegions };
   })();
 
   // src/ui/notifications.ts
@@ -2122,31 +2172,6 @@ GM_addStyle(`/* === CSS Custom Properties === */
     __name(ensureContainer, "ensureContainer");
     function injectStyles() {
       if (styleInjected) return;
-      GM_addStyle(`
-      @keyframes ff-slideIn  { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
-      @keyframes ff-slideOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100%); } }
-      #fluxfind-toasts {
-        position: fixed; top: 20px; right: 20px; z-index: 999999999999;
-        display: flex; flex-direction: column; gap: 8px; pointer-events: none;
-      }
-      .ff-toast {
-        background: #2d2d2d; color: #e8e8e8; padding: 12px 16px; border-radius: 8px;
-        font: 500 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        min-width: 280px; max-width: 420px; border: 1px solid rgba(255,255,255,0.15);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.35); animation: ff-slideIn 0.3s ease-out forwards;
-        pointer-events: auto; position: relative; overflow: hidden;
-      }
-      .ff-toast.removing { animation: ff-slideOut 0.3s ease-in forwards; }
-      .ff-toast-content { display: flex; align-items: center; gap: 10px; }
-      .ff-toast-icon { flex-shrink: 0; width: 18px; height: 18px; display: flex; align-items: center; }
-      .ff-toast-message { flex: 1; line-height: 1.4; }
-      .ff-toast-close {
-        position: absolute; top: 6px; right: 8px; width: 22px; height: 22px;
-        background: none; border: none; color: #888; cursor: pointer; font-size: 16px;
-        display: flex; align-items: center; justify-content: center; border-radius: 4px;
-      }
-      .ff-toast-close:hover { color: #fff; background: rgba(255,255,255,0.1); }
-    `);
       styleInjected = true;
     }
     __name(injectStyles, "injectStyles");
@@ -2362,10 +2387,6 @@ GM_addStyle(`/* === CSS Custom Properties === */
       return defaultCount > 0 ? defaultCount : 50;
     }
     __name(getMaxServerCount, "getMaxServerCount");
-    function getRegionScanCount() {
-      return Math.min(getMaxServerCount(), 50);
-    }
-    __name(getRegionScanCount, "getRegionScanCount");
     async function scanAndCacheRegions(force = false) {
       if (!force && regionScanDone) {
         FluxLogger.info("ServerBrowser", "Region scan: already completed, skipping");
@@ -2377,13 +2398,55 @@ GM_addStyle(`/* === CSS Custom Properties === */
         serverObserver.disconnect();
         serverObserver = null;
       }
-      const maxServers = getMaxServerCount();
-      FluxLogger.info("ServerBrowser", `Region scan starting (max servers: ${String(maxServers)})`);
-      FluxNotifications.show(`Fetching up to ${String(maxServers)} servers...`, "info", 4e3);
-      let servers;
+      const targetCountry = FluxStorage.get("serverregionfilter") ?? "";
+      const targetGroup = targetCountry ? FluxConstants.getCountryGroup(targetCountry) : null;
+      const MIN_MATCHES = 10;
+      const MAX_PAGES = 3;
+      const PER_PAGE = 50;
+      FluxLogger.info("ServerBrowser", `Region scan starting (target: ${targetCountry || "none"}, min matches: ${String(MIN_MATCHES)}, max pages: ${String(MAX_PAGES)})`);
+      FluxNotifications.show(`Scanning servers for ${targetCountry || "all regions"}...`, "info", 4e3);
+      let allFetchedServers = [];
+      const regionMap = /* @__PURE__ */ new Map();
+      let matchedCount = 0;
+      let cursor = null;
+      let totalPages = 0;
       try {
         FluxLogger.timeStart("server-fetch");
-        servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, "Desc", maxServers);
+        for (let p = 0; p < MAX_PAGES; p++) {
+          totalPages = p + 1;
+          const page = await FluxGamesAPI.fetchPublicServersPage(currentGameId, "Desc", PER_PAGE, cursor);
+          if (page.servers.length === 0) break;
+          allFetchedServers = allFetchedServers.concat(page.servers);
+          cursor = page.nextCursor;
+          FluxLogger.info("ServerBrowser", `Page ${String(totalPages)}: ${String(page.servers.length)} servers (total: ${String(allFetchedServers.length)})`);
+          const idsToScan = page.servers.map((s) => s.id);
+          const pageRegions = await FluxGamesAPI.fetchServerRegions(currentGameId, idsToScan);
+          pageRegions.forEach((region, sid) => {
+            regionMap.set(sid, region);
+          });
+          if (targetCountry) {
+            matchedCount = 0;
+            allFetchedServers.forEach((s) => {
+              const r = regionMap.get(s.id);
+              if (!r) return;
+              if (r.countryCode === targetCountry) {
+                matchedCount++;
+                return;
+              }
+              if (targetGroup && FluxConstants.getCountryGroup(r.countryCode) === targetGroup) {
+                matchedCount++;
+              }
+            });
+            FluxLogger.info("ServerBrowser", `Match count: ${String(matchedCount)}/${String(allFetchedServers.length)} (need ${String(MIN_MATCHES)})`);
+            if (matchedCount >= MIN_MATCHES) {
+              FluxLogger.info("ServerBrowser", `Enough matches found (${String(matchedCount)}), stopping pagination`);
+              break;
+            }
+          } else {
+            break;
+          }
+          if (!cursor) break;
+        }
         FluxLogger.timeEnd("server-fetch", "ServerBrowser");
       } catch (e) {
         FluxLogger.error("ServerBrowser", `Server fetch failed: ${String(e)}`);
@@ -2391,19 +2454,16 @@ GM_addStyle(`/* === CSS Custom Properties === */
         observeServerList();
         return;
       }
-      if (servers.length === 0) {
+      if (allFetchedServers.length === 0) {
         FluxLogger.warn("ServerBrowser", "0 servers returned from API");
         FluxNotifications.show("No public servers found", "warning", 3e3);
         observeServerList();
         return;
       }
-      FluxLogger.info("ServerBrowser", `Fetched ${String(servers.length)} servers, scanning regions...`);
-      const scanCount = getRegionScanCount();
-      const idsToScan = servers.slice(0, scanCount).map((s) => s.id);
-      const regionMap = await FluxGamesAPI.fetchServerRegions(currentGameId, idsToScan);
+      FluxLogger.info("ServerBrowser", `Scan complete: ${String(allFetchedServers.length)} servers across ${String(totalPages)} page(s), ${String(regionMap.size)} regions resolved`);
       const allTokens = [];
       const tokenSet = /* @__PURE__ */ new Set();
-      servers.forEach((s) => {
+      allFetchedServers.forEach((s) => {
         s.playerTokens.forEach((t) => {
           if (!tokenSet.has(t)) {
             tokenSet.add(t);
@@ -2446,18 +2506,15 @@ GM_addStyle(`/* === CSS Custom Properties === */
         }
         FluxLogger.timeEnd("thumbnail-fetch", "ServerBrowser");
         FluxLogger.info("ServerBrowser", `Thumbnail map built: ${String(thumbnailMap.size)}/${String(allTokens.length)} player tokens resolved`);
-        if (servers.length > 0) {
-          const firstServer = servers[0];
+        if (allFetchedServers.length > 0) {
+          const firstServer = allFetchedServers[0];
           if (firstServer !== void 0) {
             const rawTokens = firstServer.playerTokens.slice(0, 6);
-            const tokenReport = rawTokens.map((t) => {
-              const has = thumbnailMap.has(t);
-              return `${t.slice(0, 12)}...\u2192${has ? "\u2713" : "\u2717"}`;
-            });
+            const tokenReport = rawTokens.map((t) => `${t.slice(0, 12)}...\u2192${thumbnailMap.has(t) ? "\u2713" : "\u2717"}`);
             FluxLogger.info("ServerBrowser", `Token lookup sample (first server): [${tokenReport.join(", ")}]`);
           }
         }
-        const sampleServers = servers.slice(0, 5);
+        const sampleServers = allFetchedServers.slice(0, 5);
         const sampleReport = sampleServers.map((s) => {
           const total = s.playerTokens.length;
           const resolved = s.playerTokens.filter((t) => thumbnailMap.has(t)).length;
@@ -2465,7 +2522,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
         });
         FluxLogger.info("ServerBrowser", `Token resolution sample: [${sampleReport.join("] [")}]`);
       }
-      allServers = servers.slice(0, scanCount).map((s) => ({
+      allServers = allFetchedServers.slice(0, 150).map((s) => ({
         id: s.id,
         playing: s.playing,
         maxPlayers: s.maxPlayers,
