@@ -2383,7 +2383,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
       let servers;
       try {
         FluxLogger.timeStart("server-fetch");
-        servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, "Asc", maxServers);
+        servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, "Desc", maxServers);
         FluxLogger.timeEnd("server-fetch", "ServerBrowser");
       } catch (e) {
         FluxLogger.error("ServerBrowser", `Server fetch failed: ${String(e)}`);

@@ -57,7 +57,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     let servers: { id: string; maxPlayers: number; playing: number; playerTokens: string[] }[];
     try {
       FluxLogger.timeStart('server-fetch');
-      servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, 'Asc', maxServers);
+      servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, 'Desc', maxServers);
       FluxLogger.timeEnd('server-fetch', 'ServerBrowser');
     } catch (e) {
       FluxLogger.error('ServerBrowser', `Server fetch failed: ${String(e)}`);
