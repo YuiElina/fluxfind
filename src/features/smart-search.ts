@@ -57,7 +57,8 @@ export const FluxFeatureSmartSearch = ((): { start: () => void; stop: () => void
       const data = await resp.json() as { searchResults?: { contentGroupType?: string; contents?: { universeId: number; name: string; playerCount: number; rootPlaceId: number }[] }[] };
       const gameGroup = (data.searchResults ?? []).find(g => g.contentGroupType === 'Game');
       if (!gameGroup?.contents) return [];
-      const games = gameGroup.contents.slice(0, 8);
+      const games = gameGroup.contents.slice(0, 10);
+      FluxLogger.debug('SmartSearch', `Fetched ${String(games.length)} games for "${query}"`);
 
       // Fetch game icons in batch
       const iconBody = games.map(g => ({
@@ -97,7 +98,8 @@ export const FluxFeatureSmartSearch = ((): { start: () => void; stop: () => void
       const data = await resp.json() as { searchResults?: { contentGroupType?: string; contents?: { contentId: number; username: string; displayName: string }[] }[] };
       const userGroup = (data.searchResults ?? []).find(g => g.contentGroupType === 'User');
       if (!userGroup?.contents) return [];
-      const users = userGroup.contents.slice(0, 8);
+      const users = userGroup.contents.slice(0, 10);
+      FluxLogger.debug('SmartSearch', `Fetched ${String(users.length)} users for "${query}"`);
 
       // Fetch avatar headshots in batch
       const avatarBody = users.map(u => ({
@@ -131,74 +133,80 @@ export const FluxFeatureSmartSearch = ((): { start: () => void; stop: () => void
     return String(n);
   }
 
-  async function showResults(query: string, tab: SearchTab): Promise<void> {
-    if (!overlay || !dropdown) return;
+  function renderTabsHTML(): string {
+    return `<div class="ff-search-tabs">
+      <span class="ff-search-tab ${activeTab === 'games' ? 'ff-active' : ''}" data-tab="games">${FluxIcons.get('gamepad', { size: 14 })} Games</span>
+      <span class="ff-search-tab ${activeTab === 'games' ? '' : 'ff-active'}" data-tab="people">${FluxIcons.get('user', { size: 14 })} People</span>
+    </div>`;
+  }
 
-    if (tab === 'games') {
-      FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">Searching games for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"...</div><div class="ff-search-loading"><div class="ff-spinner"></div></div></div>`);
-      overlay.style.display = 'flex';
+  function renderGameRows(games: GameResult[]): string {
+    return games.map(g => `<a href="/games/${String(g.rootPlaceId)}/" class="ff-search-result">
+      <img class="ff-search-thumb" src="${FluxSanitizer.sanitizeUrl(g.imageUrl ?? '')}" alt="" loading="lazy" onerror="this.style.display='none'" />
+      <div class="ff-search-info">
+        <span class="ff-search-name">${FluxSanitizer.escapeHtml(g.name)}</span>
+        <span class="ff-search-meta">
+          <span class="ff-player-badge">${FluxIcons.get('user', { size: 12 })} ${formatCount(g.playerCount)} playing</span>
+        </span>
+      </div>
+    </a>`).join('');
+  }
 
-      const games = await fetchGames(query);
+  function renderUserRows(users: UserResult[]): string {
+    return users.map(u => `<a href="/users/${String(u.userId)}/profile" class="ff-search-result">
+      <img class="ff-search-thumb ff-search-avatar" src="${FluxSanitizer.sanitizeUrl(u.imageUrl ?? '')}" alt="" loading="lazy" onerror="this.style.display='none'" />
+      <div class="ff-search-info">
+        <span class="ff-search-name">${FluxSanitizer.escapeHtml(u.displayName)}</span>
+        <span class="ff-search-meta">@${FluxSanitizer.escapeHtml(u.username)}</span>
+      </div>
+    </a>`).join('');
+  }
 
-      if (games.length === 0) {
-        FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">No games found for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"</div></div>`);
-        return;
-      }
-
-      const rows = games.map(g => `<a href="/games/${String(g.rootPlaceId)}/" class="ff-search-result">
-        <img class="ff-search-thumb" src="${FluxSanitizer.sanitizeUrl(g.imageUrl ?? '')}" alt="" loading="lazy" onerror="this.style.display='none'" />
-        <div class="ff-search-info">
-          <span class="ff-search-name">${FluxSanitizer.escapeHtml(g.name)}</span>
-          <span class="ff-search-meta"><span class="ff-player-badge">${FluxIcons.get('user', { size: 12 })} ${formatCount(g.playerCount)}</span></span>
-        </div>
-      </a>`).join('');
-
-      dropdown.innerHTML = `<div class="ff-search-dropdown">
-        <div class="ff-search-tabs">
-          <span class="ff-search-tab ff-active" data-tab="games">${FluxIcons.get('gamepad', { size: 14 })} Games</span>
-          <span class="ff-search-tab" data-tab="people">${FluxIcons.get('user', { size: 14 })} People</span>
-        </div>
-        <div class="ff-search-items">${rows}</div>
-      </div>`;
-    } else {
-      FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">Searching people for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"...</div><div class="ff-search-loading"><div class="ff-spinner"></div></div></div>`);
-
-      const users = await fetchUsers(query);
-
-      if (users.length === 0) {
-        FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">No people found for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"</div></div>`);
-        return;
-      }
-
-      const rows = users.map(u => `<a href="/users/${String(u.userId)}/profile" class="ff-search-result">
-        <img class="ff-search-thumb ff-search-avatar" src="${FluxSanitizer.sanitizeUrl(u.imageUrl ?? '')}" alt="" loading="lazy" onerror="this.style.display='none'" />
-        <div class="ff-search-info">
-          <span class="ff-search-name">${FluxSanitizer.escapeHtml(u.displayName)}</span>
-          <span class="ff-search-meta">@${FluxSanitizer.escapeHtml(u.username)}</span>
-        </div>
-      </a>`).join('');
-
-      dropdown.innerHTML = `<div class="ff-search-dropdown">
-        <div class="ff-search-tabs">
-          <span class="ff-search-tab" data-tab="games">${FluxIcons.get('gamepad', { size: 14 })} Games</span>
-          <span class="ff-search-tab ff-active" data-tab="people">${FluxIcons.get('user', { size: 14 })} People</span>
-        </div>
-        <div class="ff-search-items">${rows}</div>
-      </div>`;
-    }
-
-    // Wire tab clicks
+  function wireTabClicks(): void {
+    if (!dropdown) return;
     dropdown.querySelectorAll('.ff-search-tab').forEach(tabEl => {
       tabEl.addEventListener('click', function (this: HTMLElement) {
         const newTab = this.dataset.tab as SearchTab | undefined;
-        if (!newTab) return;
+        if (!newTab || newTab === activeTab) return;
         activeTab = newTab;
         const input = getSearchInput();
         if (input) void showResults(input.value.trim(), activeTab);
       });
     });
+  }
 
-    overlay.style.display = 'flex';
+  async function showResults(query: string, tab: SearchTab): Promise<void> {
+    if (!overlay || !dropdown) return;
+
+    if (tab === 'games') {
+      FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-loading"><div class="ff-spinner"></div></div>`);
+      overlay.style.display = 'flex';
+
+      const games = await fetchGames(query);
+
+      if (games.length === 0) {
+        FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-header">No games found for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"</div>`);
+        wireTabClicks();
+        return;
+      }
+
+      FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-header">${String(games.length)} games found</div><div class="ff-search-items">${renderGameRows(games)}</div>`);
+      wireTabClicks();
+    } else {
+      FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-loading"><div class="ff-spinner"></div></div>`);
+      overlay.style.display = 'flex';
+
+      const users = await fetchUsers(query);
+
+      if (users.length === 0) {
+        FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-header">No people found for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"</div>`);
+        wireTabClicks();
+        return;
+      }
+
+      FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-header">${String(users.length)} people found</div><div class="ff-search-items">${renderUserRows(users)}</div>`);
+      wireTabClicks();
+    }
   }
 
   function hideOverlay(): void {
@@ -207,13 +215,14 @@ export const FluxFeatureSmartSearch = ((): { start: () => void; stop: () => void
   }
 
   function createUI(): void {
+    // Invisible backdrop to capture clicks outside
     overlay = document.createElement('div');
-    overlay.id = 'ff-search-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:none;flex-direction:column;align-items:center;padding-top:80px;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);';
+    overlay.className = 'ff-search-overlay';
     overlay.addEventListener('click', (e) => { if (e.target === overlay) hideOverlay(); });
 
+    // Solid card dropdown
     dropdown = document.createElement('div');
-    dropdown.className = 'ff-search-container';
+    dropdown.className = 'ff-search-dropdown';
     overlay.appendChild(dropdown);
     document.body.appendChild(overlay);
   }
@@ -258,6 +267,7 @@ export const FluxFeatureSmartSearch = ((): { start: () => void; stop: () => void
       if (e.key === 'Escape') hideOverlay();
     });
 
+    // Periodically hide Roblox's dropdown
     setInterval(hideRobloxDropdown, 200);
   }
 

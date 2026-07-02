@@ -168,6 +168,96 @@
 
 .ff-toast-close:hover { color: var(--ff-text-primary); background: var(--ff-bg-hover); }
 
+/* === Smart Search Dropdown === */
+.ff-search-overlay {
+    position: fixed; inset: 0; z-index: 10000;
+    display: none; align-items: flex-start; justify-content: center;
+    padding-top: 120px;
+}
+
+.ff-search-dropdown {
+    background: var(--ff-bg-tertiary);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-lg);
+    box-shadow: var(--ff-shadow-lg);
+    width: 460px; max-height: 420px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+
+.ff-search-tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--ff-border);
+    flex-shrink: 0;
+}
+
+.ff-search-tab {
+    flex: 1; padding: 10px 16px; font-size: 13px; font-weight: 500;
+    color: var(--ff-text-muted); text-align: center; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.15s ease;
+    user-select: none; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
+.ff-search-tab:hover { color: var(--ff-text-primary); }
+
+.ff-search-tab.ff-active {
+    color: var(--ff-accent); border-bottom-color: var(--ff-accent);
+    font-weight: 600;
+}
+
+.ff-search-items {
+    flex: 1; overflow-y: auto; padding: 4px 0;
+}
+
+.ff-search-header {
+    padding: 12px 16px; font-size: 13px; color: var(--ff-text-muted);
+    border-bottom: 1px solid var(--ff-border);
+}
+
+.ff-search-loading {
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+}
+
+.ff-search-result {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    text-decoration: none; color: var(--ff-text-primary);
+    transition: background 0.12s ease; cursor: pointer;
+    border-left: 3px solid transparent;
+}
+
+.ff-search-result:hover {
+    background: var(--ff-bg-hover);
+    border-left-color: var(--ff-accent);
+}
+
+.ff-search-thumb {
+    width: 44px; height: 44px; border-radius: var(--ff-radius-sm);
+    object-fit: cover; flex-shrink: 0; background: var(--ff-bg-secondary);
+}
+
+.ff-search-avatar { border-radius: 50%; }
+
+.ff-search-info {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+}
+
+.ff-search-name {
+    font-size: 14px; font-weight: 500; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+}
+
+.ff-search-meta {
+    font-size: 12px; color: var(--ff-text-muted);
+    display: flex; align-items: center; gap: 6px;
+}
+
+.ff-player-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 10px; font-size: 11px;
+    font-weight: 600; background: rgba(108,92,231,0.15);
+    color: var(--ff-accent);
+}
+
 /* === Spinner & Skeleton === */
 .ff-spinner {
     display: inline-block; width: 16px; height: 16px;

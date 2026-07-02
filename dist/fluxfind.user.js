@@ -246,6 +246,96 @@ GM_addStyle(`/* === CSS Custom Properties === */
 
 .ff-toast-close:hover { color: var(--ff-text-primary); background: var(--ff-bg-hover); }
 
+/* === Smart Search Dropdown === */
+.ff-search-overlay {
+    position: fixed; inset: 0; z-index: 10000;
+    display: none; align-items: flex-start; justify-content: center;
+    padding-top: 120px;
+}
+
+.ff-search-dropdown {
+    background: var(--ff-bg-tertiary);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-lg);
+    box-shadow: var(--ff-shadow-lg);
+    width: 460px; max-height: 420px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+
+.ff-search-tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--ff-border);
+    flex-shrink: 0;
+}
+
+.ff-search-tab {
+    flex: 1; padding: 10px 16px; font-size: 13px; font-weight: 500;
+    color: var(--ff-text-muted); text-align: center; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.15s ease;
+    user-select: none; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
+.ff-search-tab:hover { color: var(--ff-text-primary); }
+
+.ff-search-tab.ff-active {
+    color: var(--ff-accent); border-bottom-color: var(--ff-accent);
+    font-weight: 600;
+}
+
+.ff-search-items {
+    flex: 1; overflow-y: auto; padding: 4px 0;
+}
+
+.ff-search-header {
+    padding: 12px 16px; font-size: 13px; color: var(--ff-text-muted);
+    border-bottom: 1px solid var(--ff-border);
+}
+
+.ff-search-loading {
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+}
+
+.ff-search-result {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    text-decoration: none; color: var(--ff-text-primary);
+    transition: background 0.12s ease; cursor: pointer;
+    border-left: 3px solid transparent;
+}
+
+.ff-search-result:hover {
+    background: var(--ff-bg-hover);
+    border-left-color: var(--ff-accent);
+}
+
+.ff-search-thumb {
+    width: 44px; height: 44px; border-radius: var(--ff-radius-sm);
+    object-fit: cover; flex-shrink: 0; background: var(--ff-bg-secondary);
+}
+
+.ff-search-avatar { border-radius: 50%; }
+
+.ff-search-info {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+}
+
+.ff-search-name {
+    font-size: 14px; font-weight: 500; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+}
+
+.ff-search-meta {
+    font-size: 12px; color: var(--ff-text-muted);
+    display: flex; align-items: center; gap: 6px;
+}
+
+.ff-player-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 10px; font-size: 11px;
+    font-weight: 600; background: rgba(108,92,231,0.15);
+    color: var(--ff-accent);
+}
+
 /* === Spinner & Skeleton === */
 .ff-spinner {
     display: inline-block; width: 16px; height: 16px;
@@ -2982,7 +3072,8 @@ GM_addStyle(`/* === CSS Custom Properties === */
         const data = await resp.json();
         const gameGroup = (data.searchResults ?? []).find((g) => g.contentGroupType === "Game");
         if (!gameGroup?.contents) return [];
-        const games = gameGroup.contents.slice(0, 8);
+        const games = gameGroup.contents.slice(0, 10);
+        FluxLogger.debug("SmartSearch", `Fetched ${String(games.length)} games for "${query}"`);
         const iconBody = games.map((g) => ({
           requestId: `${String(g.universeId)}::GameIcon:256x256:webp:regular:::false`,
           type: "GameIcon",
@@ -3019,7 +3110,8 @@ GM_addStyle(`/* === CSS Custom Properties === */
         const data = await resp.json();
         const userGroup = (data.searchResults ?? []).find((g) => g.contentGroupType === "User");
         if (!userGroup?.contents) return [];
-        const users = userGroup.contents.slice(0, 8);
+        const users = userGroup.contents.slice(0, 10);
+        FluxLogger.debug("SmartSearch", `Fetched ${String(users.length)} users for "${query}"`);
         const avatarBody = users.map((u) => ({
           requestId: `${String(u.contentId)}:undefined:AvatarHeadshot:150x150:webp:regular:0::false`,
           type: "AvatarHeadShot",
@@ -3050,62 +3142,73 @@ GM_addStyle(`/* === CSS Custom Properties === */
       return String(n);
     }
     __name(formatCount, "formatCount");
-    async function showResults(query, tab) {
-      if (!overlay || !dropdown) return;
-      if (tab === "games") {
-        FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">Searching games for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"...</div><div class="ff-search-loading"><div class="ff-spinner"></div></div></div>`);
-        overlay.style.display = "flex";
-        const games = await fetchGames(query);
-        if (games.length === 0) {
-          FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">No games found for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"</div></div>`);
-          return;
-        }
-        const rows = games.map((g) => `<a href="/games/${String(g.rootPlaceId)}/" class="ff-search-result">
-        <img class="ff-search-thumb" src="${FluxSanitizer.sanitizeUrl(g.imageUrl ?? "")}" alt="" loading="lazy" onerror="this.style.display='none'" />
-        <div class="ff-search-info">
-          <span class="ff-search-name">${FluxSanitizer.escapeHtml(g.name)}</span>
-          <span class="ff-search-meta"><span class="ff-player-badge">${FluxIcons.get("user", { size: 12 })} ${formatCount(g.playerCount)}</span></span>
-        </div>
-      </a>`).join("");
-        dropdown.innerHTML = `<div class="ff-search-dropdown">
-        <div class="ff-search-tabs">
-          <span class="ff-search-tab ff-active" data-tab="games">${FluxIcons.get("gamepad", { size: 14 })} Games</span>
-          <span class="ff-search-tab" data-tab="people">${FluxIcons.get("user", { size: 14 })} People</span>
-        </div>
-        <div class="ff-search-items">${rows}</div>
-      </div>`;
-      } else {
-        FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">Searching people for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"...</div><div class="ff-search-loading"><div class="ff-spinner"></div></div></div>`);
-        const users = await fetchUsers(query);
-        if (users.length === 0) {
-          FluxSanitizer.safeInnerHTML(dropdown, `<div class="ff-search-dropdown"><div class="ff-search-header">No people found for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"</div></div>`);
-          return;
-        }
-        const rows = users.map((u) => `<a href="/users/${String(u.userId)}/profile" class="ff-search-result">
-        <img class="ff-search-thumb ff-search-avatar" src="${FluxSanitizer.sanitizeUrl(u.imageUrl ?? "")}" alt="" loading="lazy" onerror="this.style.display='none'" />
-        <div class="ff-search-info">
-          <span class="ff-search-name">${FluxSanitizer.escapeHtml(u.displayName)}</span>
-          <span class="ff-search-meta">@${FluxSanitizer.escapeHtml(u.username)}</span>
-        </div>
-      </a>`).join("");
-        dropdown.innerHTML = `<div class="ff-search-dropdown">
-        <div class="ff-search-tabs">
-          <span class="ff-search-tab" data-tab="games">${FluxIcons.get("gamepad", { size: 14 })} Games</span>
-          <span class="ff-search-tab ff-active" data-tab="people">${FluxIcons.get("user", { size: 14 })} People</span>
-        </div>
-        <div class="ff-search-items">${rows}</div>
-      </div>`;
-      }
+    function renderTabsHTML() {
+      return `<div class="ff-search-tabs">
+      <span class="ff-search-tab ${activeTab === "games" ? "ff-active" : ""}" data-tab="games">${FluxIcons.get("gamepad", { size: 14 })} Games</span>
+      <span class="ff-search-tab ${activeTab === "games" ? "" : "ff-active"}" data-tab="people">${FluxIcons.get("user", { size: 14 })} People</span>
+    </div>`;
+    }
+    __name(renderTabsHTML, "renderTabsHTML");
+    function renderGameRows(games) {
+      return games.map((g) => `<a href="/games/${String(g.rootPlaceId)}/" class="ff-search-result">
+      <img class="ff-search-thumb" src="${FluxSanitizer.sanitizeUrl(g.imageUrl ?? "")}" alt="" loading="lazy" onerror="this.style.display='none'" />
+      <div class="ff-search-info">
+        <span class="ff-search-name">${FluxSanitizer.escapeHtml(g.name)}</span>
+        <span class="ff-search-meta">
+          <span class="ff-player-badge">${FluxIcons.get("user", { size: 12 })} ${formatCount(g.playerCount)} playing</span>
+        </span>
+      </div>
+    </a>`).join("");
+    }
+    __name(renderGameRows, "renderGameRows");
+    function renderUserRows(users) {
+      return users.map((u) => `<a href="/users/${String(u.userId)}/profile" class="ff-search-result">
+      <img class="ff-search-thumb ff-search-avatar" src="${FluxSanitizer.sanitizeUrl(u.imageUrl ?? "")}" alt="" loading="lazy" onerror="this.style.display='none'" />
+      <div class="ff-search-info">
+        <span class="ff-search-name">${FluxSanitizer.escapeHtml(u.displayName)}</span>
+        <span class="ff-search-meta">@${FluxSanitizer.escapeHtml(u.username)}</span>
+      </div>
+    </a>`).join("");
+    }
+    __name(renderUserRows, "renderUserRows");
+    function wireTabClicks() {
+      if (!dropdown) return;
       dropdown.querySelectorAll(".ff-search-tab").forEach((tabEl) => {
         tabEl.addEventListener("click", function() {
           const newTab = this.dataset.tab;
-          if (!newTab) return;
+          if (!newTab || newTab === activeTab) return;
           activeTab = newTab;
           const input = getSearchInput();
           if (input) void showResults(input.value.trim(), activeTab);
         });
       });
-      overlay.style.display = "flex";
+    }
+    __name(wireTabClicks, "wireTabClicks");
+    async function showResults(query, tab) {
+      if (!overlay || !dropdown) return;
+      if (tab === "games") {
+        FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-loading"><div class="ff-spinner"></div></div>`);
+        overlay.style.display = "flex";
+        const games = await fetchGames(query);
+        if (games.length === 0) {
+          FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-header">No games found for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"</div>`);
+          wireTabClicks();
+          return;
+        }
+        FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-header">${String(games.length)} games found</div><div class="ff-search-items">${renderGameRows(games)}</div>`);
+        wireTabClicks();
+      } else {
+        FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-loading"><div class="ff-spinner"></div></div>`);
+        overlay.style.display = "flex";
+        const users = await fetchUsers(query);
+        if (users.length === 0) {
+          FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-header">No people found for "<strong>${FluxSanitizer.escapeHtml(query)}</strong>"</div>`);
+          wireTabClicks();
+          return;
+        }
+        FluxSanitizer.safeInnerHTML(dropdown, `${renderTabsHTML()}<div class="ff-search-header">${String(users.length)} people found</div><div class="ff-search-items">${renderUserRows(users)}</div>`);
+        wireTabClicks();
+      }
     }
     __name(showResults, "showResults");
     function hideOverlay() {
@@ -3118,13 +3221,12 @@ GM_addStyle(`/* === CSS Custom Properties === */
     __name(hideOverlay, "hideOverlay");
     function createUI() {
       overlay = document.createElement("div");
-      overlay.id = "ff-search-overlay";
-      overlay.style.cssText = "position:fixed;inset:0;z-index:10000;display:none;flex-direction:column;align-items:center;padding-top:80px;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);";
+      overlay.className = "ff-search-overlay";
       overlay.addEventListener("click", (e) => {
         if (e.target === overlay) hideOverlay();
       });
       dropdown = document.createElement("div");
-      dropdown.className = "ff-search-container";
+      dropdown.className = "ff-search-dropdown";
       overlay.appendChild(dropdown);
       document.body.appendChild(overlay);
     }
