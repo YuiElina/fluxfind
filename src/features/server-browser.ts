@@ -115,6 +115,15 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       }
       FluxLogger.timeEnd('thumbnail-fetch', 'ServerBrowser');
       FluxLogger.info('ServerBrowser', `Thumbnail map built: ${String(thumbnailMap.size)}/${String(allTokens.length)} player tokens resolved`);
+
+      // Diagnostic: log token→thumbnail resolution for first 5 servers
+      const sampleServers = servers.slice(0, 5);
+      const sampleReport = sampleServers.map(s => {
+        const total = s.playerTokens.length;
+        const resolved = s.playerTokens.filter(t => thumbnailMap.has(t)).length;
+        return `${String(total)} tokens → ${String(resolved)} thumbs`;
+      });
+      FluxLogger.info('ServerBrowser', `Token resolution sample: [${sampleReport.join('] [')}]`);
     }
 
     allServers = servers.slice(0, scanCount).map(s => ({
