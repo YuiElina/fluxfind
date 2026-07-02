@@ -36,10 +36,6 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     return defaultCount > 0 ? defaultCount : 50;
   }
 
-  function getRegionScanCount(): number {
-    return Math.min(getMaxServerCount(), 50);
-  }
-
   async function scanAndCacheRegions(force = false): Promise<void> {
     if (!force && regionScanDone) {
       FluxLogger.info('ServerBrowser', 'Region scan: already completed, skipping');
@@ -50,14 +46,60 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
     if (serverObserver) { serverObserver.disconnect(); serverObserver = null; }
 
-    const maxServers = getMaxServerCount();
-    FluxLogger.info('ServerBrowser', `Region scan starting (max servers: ${String(maxServers)})`);
-    FluxNotifications.show(`Fetching up to ${String(maxServers)} servers...`, 'info', 4000);
+    const targetCountry = FluxStorage.get('serverregionfilter') ?? '';
+    const targetGroup = targetCountry ? FluxConstants.getCountryGroup(targetCountry) : null;
+    const MIN_MATCHES = 10;
+    const MAX_PAGES = 3;
+    const PER_PAGE = 50; // servers to scan per page
 
-    let servers: { id: string; maxPlayers: number; playing: number; playerTokens: string[] }[];
+    FluxLogger.info('ServerBrowser', `Region scan starting (target: ${targetCountry || 'none'}, min matches: ${String(MIN_MATCHES)}, max pages: ${String(MAX_PAGES)})`);
+    FluxNotifications.show(`Scanning servers for ${targetCountry || 'all regions'}...`, 'info', 4000);
+
+    let allFetchedServers: { id: string; maxPlayers: number; playing: number; playerTokens: string[] }[] = [];
+    const regionMap = new Map<string, { city: string | null; country: string; countryCode: string }>();
+    let matchedCount = 0;
+    let cursor: string | null = null;
+    let totalPages = 0;
+
+    // Leaky bucket: paginate until we have enough matches or hit the cap
     try {
       FluxLogger.timeStart('server-fetch');
-      servers = await FluxGamesAPI.fetchAllPublicServers(currentGameId, 'Desc', maxServers);
+      for (let p = 0; p < MAX_PAGES; p++) {
+        totalPages = p + 1;
+        const page = await FluxGamesAPI.fetchPublicServersPage(currentGameId, 'Desc', PER_PAGE, cursor);
+        if (page.servers.length === 0) break;
+
+        allFetchedServers = allFetchedServers.concat(page.servers);
+        cursor = page.nextCursor;
+        FluxLogger.info('ServerBrowser', `Page ${String(totalPages)}: ${String(page.servers.length)} servers (total: ${String(allFetchedServers.length)})`);
+
+        // Scan this page's regions
+        const idsToScan = page.servers.map(s => s.id);
+        const pageRegions = await FluxGamesAPI.fetchServerRegions(currentGameId, idsToScan);
+        pageRegions.forEach((region, sid) => { regionMap.set(sid, region); });
+
+        // Count matches
+        if (targetCountry) {
+          matchedCount = 0;
+          allFetchedServers.forEach(s => {
+            const r = regionMap.get(s.id);
+            if (!r) return;
+            if (r.countryCode === targetCountry) { matchedCount++; return; }
+            if (targetGroup && FluxConstants.getCountryGroup(r.countryCode) === targetGroup) { matchedCount++; }
+          });
+          FluxLogger.info('ServerBrowser', `Match count: ${String(matchedCount)}/${String(allFetchedServers.length)} (need ${String(MIN_MATCHES)})`);
+
+          if (matchedCount >= MIN_MATCHES) {
+            FluxLogger.info('ServerBrowser', `Enough matches found (${String(matchedCount)}), stopping pagination`);
+            break;
+          }
+        } else {
+          // No filter — stop after first page
+          break;
+        }
+
+        if (!cursor) break;
+      }
       FluxLogger.timeEnd('server-fetch', 'ServerBrowser');
     } catch (e) {
       FluxLogger.error('ServerBrowser', `Server fetch failed: ${String(e)}`);
@@ -66,22 +108,18 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       return;
     }
 
-    if (servers.length === 0) {
+    if (allFetchedServers.length === 0) {
       FluxLogger.warn('ServerBrowser', '0 servers returned from API');
       FluxNotifications.show('No public servers found', 'warning', 3000);
       observeServerList();
       return;
     }
 
-    FluxLogger.info('ServerBrowser', `Fetched ${String(servers.length)} servers, scanning regions...`);
-
-    const scanCount = getRegionScanCount();
-    const idsToScan = servers.slice(0, scanCount).map(s => s.id);
-    const regionMap = await FluxGamesAPI.fetchServerRegions(currentGameId, idsToScan);
+      FluxLogger.info('ServerBrowser', `Scan complete: ${String(allFetchedServers.length)} servers across ${String(totalPages)} page(s), ${String(regionMap.size)} regions resolved`);
 
     const allTokens: string[] = [];
     const tokenSet = new Set<string>();
-    servers.forEach(s => {
+    allFetchedServers.forEach(s => {
       s.playerTokens.forEach(t => { if (!tokenSet.has(t)) { tokenSet.add(t); allTokens.push(t); } });
     });
 
@@ -99,7 +137,6 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
           const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(chunk, false);
           let resolvedInChunk = 0;
 
-          // Diagnostic: dump first result's raw requestId and token on first batch
           if (i === 0 && thumbs.length > 0) {
             const first = thumbs[0];
             if (first !== undefined) {
@@ -125,21 +162,16 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       FluxLogger.timeEnd('thumbnail-fetch', 'ServerBrowser');
       FluxLogger.info('ServerBrowser', `Thumbnail map built: ${String(thumbnailMap.size)}/${String(allTokens.length)} player tokens resolved`);
 
-      // Diagnostic: log raw token comparison for first server
-      if (servers.length > 0) {
-        const firstServer = servers[0];
+      if (allFetchedServers.length > 0) {
+        const firstServer = allFetchedServers[0];
         if (firstServer !== undefined) {
           const rawTokens = firstServer.playerTokens.slice(0, 6);
-          const tokenReport = rawTokens.map(t => {
-            const has = thumbnailMap.has(t);
-            return `${t.slice(0, 12)}...→${has ? '✓' : '✗'}`;
-          });
+          const tokenReport = rawTokens.map(t => `${t.slice(0, 12)}...→${thumbnailMap.has(t) ? '✓' : '✗'}`);
           FluxLogger.info('ServerBrowser', `Token lookup sample (first server): [${tokenReport.join(', ')}]`);
         }
       }
 
-      // Diagnostic: log token→thumbnail resolution for first 5 servers
-      const sampleServers = servers.slice(0, 5);
+      const sampleServers = allFetchedServers.slice(0, 5);
       const sampleReport = sampleServers.map(s => {
         const total = s.playerTokens.length;
         const resolved = s.playerTokens.filter(t => thumbnailMap.has(t)).length;
@@ -148,7 +180,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       FluxLogger.info('ServerBrowser', `Token resolution sample: [${sampleReport.join('] [')}]`);
     }
 
-    allServers = servers.slice(0, scanCount).map(s => ({
+    allServers = allFetchedServers.slice(0, 150).map(s => ({
       id: s.id,
       playing: s.playing,
       maxPlayers: s.maxPlayers,

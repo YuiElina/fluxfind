@@ -19,31 +19,7 @@ export const FluxNotifications = ((): { show: (message: string, type?: ToastType
 
   function injectStyles(): void {
     if (styleInjected) return;
-    GM_addStyle(`
-      @keyframes ff-slideIn  { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
-      @keyframes ff-slideOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100%); } }
-      #fluxfind-toasts {
-        position: fixed; top: 20px; right: 20px; z-index: 999999999999;
-        display: flex; flex-direction: column; gap: 8px; pointer-events: none;
-      }
-      .ff-toast {
-        background: #2d2d2d; color: #e8e8e8; padding: 12px 16px; border-radius: 8px;
-        font: 500 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        min-width: 280px; max-width: 420px; border: 1px solid rgba(255,255,255,0.15);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.35); animation: ff-slideIn 0.3s ease-out forwards;
-        pointer-events: auto; position: relative; overflow: hidden;
-      }
-      .ff-toast.removing { animation: ff-slideOut 0.3s ease-in forwards; }
-      .ff-toast-content { display: flex; align-items: center; gap: 10px; }
-      .ff-toast-icon { flex-shrink: 0; width: 18px; height: 18px; display: flex; align-items: center; }
-      .ff-toast-message { flex: 1; line-height: 1.4; }
-      .ff-toast-close {
-        position: absolute; top: 6px; right: 8px; width: 22px; height: 22px;
-        background: none; border: none; color: #888; cursor: pointer; font-size: 16px;
-        display: flex; align-items: center; justify-content: center; border-radius: 4px;
-      }
-      .ff-toast-close:hover { color: #fff; background: rgba(255,255,255,0.1); }
-    `);
+    // Styles are now injected via app.ts from src/ui/css/components.css
     styleInjected = true;
   }
 

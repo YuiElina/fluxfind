@@ -6,9 +6,12 @@ import { FluxConstants } from '../config/constants';
 interface ServerEntry { id: string; maxPlayers: number; playing: number; playerTokens: string[] }
 interface RegionResult { city: string | null; country: string; countryCode: string }
 
+interface PaginatedServers { servers: ServerEntry[]; nextCursor: string | null }
+
 export const FluxGamesAPI = ((): {
   getCurrentGameId: () => number;
   fetchAllPublicServers: (gameId: number, sortOrder?: string, maxServers?: number) => Promise<ServerEntry[]>;
+  fetchPublicServersPage: (gameId: number, sortOrder: string, limit: number, cursor?: string | null) => Promise<PaginatedServers>;
   fetchServerRegions: (gameId: number, serverIds: string[]) => Promise<Map<string, RegionResult>>;
 } => {
   'use strict';
@@ -39,6 +42,15 @@ export const FluxGamesAPI = ((): {
     return allData;
   }
 
+  async function fetchPublicServersPage(gameId: number, sortOrder: string, limit: number, cursor: string | null = null): Promise<PaginatedServers> {
+    const url = `${FluxConstants.API.GAMES_API}/games/${String(gameId)}/servers/Public?sortOrder=${sortOrder}&limit=${String(limit)}&excludeFullGames=true${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`;
+    const resp = await FluxHttpClient.get(url, {}, { cache: false }) as { data?: unknown; nextPageCursor?: string };
+    return {
+      servers: (resp.data ?? []) as ServerEntry[],
+      nextCursor: resp.nextPageCursor ?? null,
+    };
+  }
+
   async function fetchSingleRegion(gameId: number, sid: string): Promise<{ sid: string; result: RegionResult | null }> {
     try {
       const data = await FluxHttpClient.post(
@@ -48,12 +60,17 @@ export const FluxGamesAPI = ((): {
       ) as Record<string, unknown>;
 
       const js: Record<string, unknown> = (data.joinScript && typeof data.joinScript === 'object') ? data.joinScript as Record<string, unknown> : data;
+
+      // Debug: log all top-level keys to find correct endpoint field name
+      const topKeys = Object.keys(js).join(', ');
+      FluxLogger.debug('GamesAPI', `Region [${sid}]: joinScript keys: [${topKeys}]`);
+
       if (Object.keys(js).length === 0) {
         FluxLogger.warn('GamesAPI', `Region [${sid}]: empty joinScript response`);
         return { sid, result: null };
       }
 
-      const endpoints = (js.UdmuxEndpoints ?? js.udmuxEndpoints) as { Address?: string }[] | undefined;
+      const endpoints = (js.UdmuxEndpoints ?? js.udmuxEndpoints ?? js.udmuxendpoints ?? js.DirectEndpoint ?? js.ConnectionEndpoints) as { Address?: string; address?: string }[] | undefined;
       if (endpoints === undefined || endpoints.length === 0) {
         FluxLogger.warn('GamesAPI', `Region [${sid}]: no UdmuxEndpoints in response`);
         return { sid, result: null };
@@ -147,5 +164,5 @@ export const FluxGamesAPI = ((): {
     return results;
   }
 
-  return { getCurrentGameId, fetchAllPublicServers, fetchServerRegions };
+  return { getCurrentGameId, fetchAllPublicServers, fetchPublicServersPage, fetchServerRegions };
 })();
