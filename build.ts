@@ -46,6 +46,7 @@ const HEADER = `// ==UserScript==
 // @connect      users.roblox.com
 // @connect      catalog.roblox.com
 // @connect      ip-api.com
+// @connect      freeipapi.com
 // ==/UserScript==
 
 `;

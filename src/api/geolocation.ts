@@ -10,9 +10,13 @@ export const FluxGeolocationAPI = ((): {
 } => {
   'use strict';
 
-  const GEO_API = 'http://ip-api.com/json';
+  const PROVIDERS = [
+    { name: 'freeipapi', base: 'https://freeipapi.com/api/json' },
+    { name: 'ip-api', base: 'http://ip-api.com/json' },
+  ];
+
   const CACHE = new Map<string, { data: GeoData; t: number }>();
-  const CACHE_TTL = 300000;
+  const CACHE_TTL = 1800000; // 30 minutes
 
   async function lookupIP(ip: string): Promise<GeoData | null> {
     if (ip === '' || ip === '0.0.0.0') return null;
@@ -23,8 +27,47 @@ export const FluxGeolocationAPI = ((): {
       return cached.data;
     }
 
+    // Try freeipapi.com first (no rate limits)
+    let result = await tryFreeipapi(ip);
+    if (result !== null) {
+      CACHE.set(ip, { data: result, t: Date.now() });
+      return result;
+    }
+
+    // Try ip-api.com
+    result = await tryIpApi(ip);
+    if (result !== null) {
+      CACHE.set(ip, { data: result, t: Date.now() });
+      return result;
+    }
+
+    return null;
+  }
+
+  async function tryFreeipapi(ip: string): Promise<GeoData | null> {
     try {
-      const data = await FluxHttpClient.get(`${GEO_API}/${ip}`, { fields: 'countryCode,country,city,regionName' }, { cache: false, retries: 1 }) as Record<string, unknown> | null;
+      const freeipapiUrl = PROVIDERS[0]?.base ?? 'https://freeipapi.com/api/json';
+      const data = await FluxHttpClient.get(`${freeipapiUrl}/${ip}`, {}, { cache: false, retries: 1 }) as Record<string, unknown> | null;
+      if (data !== null && typeof data === 'object' && typeof data.countryCode === 'string') {
+        const result: GeoData = {
+          countryCode: data.countryCode,
+          country: typeof data.countryName === 'string' ? data.countryName : data.countryCode,
+          city: typeof data.cityName === 'string' ? data.cityName : null,
+          regionName: typeof data.regionName === 'string' ? data.regionName : null,
+        };
+        FluxLogger.debug('Geolocation', `freeipapi: ${ip} → ${result.city ?? result.country} (${result.countryCode})`);
+        return result;
+      }
+    } catch (e) {
+      FluxLogger.debug('Geolocation', `freeipapi failed for ${ip}: ${String(e)}`);
+    }
+    return null;
+  }
+
+  async function tryIpApi(ip: string): Promise<GeoData | null> {
+    try {
+      const ipApiUrl = PROVIDERS[1]?.base ?? 'http://ip-api.com/json';
+      const data = await FluxHttpClient.get(`${ipApiUrl}/${ip}`, { fields: 'countryCode,country,city,regionName' }, { cache: false, retries: 1 }) as Record<string, unknown> | null;
       if (data !== null && typeof data === 'object' && typeof data.countryCode === 'string') {
         const result: GeoData = {
           countryCode: data.countryCode,
@@ -32,13 +75,11 @@ export const FluxGeolocationAPI = ((): {
           city: typeof data.city === 'string' ? data.city : null,
           regionName: typeof data.regionName === 'string' ? data.regionName : null,
         };
-        CACHE.set(ip, { data: result, t: Date.now() });
-        FluxLogger.debug('Geolocation', `Resolved ${ip} → ${result.city ?? result.country} (${result.countryCode})`);
+        FluxLogger.debug('Geolocation', `ip-api: ${ip} → ${result.city ?? result.country} (${result.countryCode})`);
         return result;
       }
-      FluxLogger.warn('Geolocation', `No countryCode in response for ${ip}`);
     } catch (e) {
-      FluxLogger.warn('Geolocation', `Lookup failed for ${ip}: ${String(e)}`);
+      FluxLogger.debug('Geolocation', `ip-api failed for ${ip}: ${String(e)}`);
     }
     return null;
   }

@@ -27,6 +27,7 @@
 // @connect      users.roblox.com
 // @connect      catalog.roblox.com
 // @connect      ip-api.com
+// @connect      freeipapi.com
 // ==/UserScript==
 
 /**
@@ -1167,9 +1168,12 @@ GM_addStyle(`/* === CSS Custom Properties === */
       init_logger();
       FluxGeolocationAPI = (() => {
         "use strict";
-        const GEO_API = "http://ip-api.com/json";
+        const PROVIDERS = [
+          { name: "freeipapi", base: "https://freeipapi.com/api/json" },
+          { name: "ip-api", base: "http://ip-api.com/json" }
+        ];
         const CACHE = /* @__PURE__ */ new Map();
-        const CACHE_TTL = 3e5;
+        const CACHE_TTL = 18e5;
         async function lookupIP(ip) {
           if (ip === "" || ip === "0.0.0.0") return null;
           const cached = CACHE.get(ip);
@@ -1177,8 +1181,43 @@ GM_addStyle(`/* === CSS Custom Properties === */
             FluxLogger.debug("Geolocation", `Cache hit for ${ip}: ${cached.data.city ?? cached.data.country}`);
             return cached.data;
           }
+          let result = await tryFreeipapi(ip);
+          if (result !== null) {
+            CACHE.set(ip, { data: result, t: Date.now() });
+            return result;
+          }
+          result = await tryIpApi(ip);
+          if (result !== null) {
+            CACHE.set(ip, { data: result, t: Date.now() });
+            return result;
+          }
+          return null;
+        }
+        __name(lookupIP, "lookupIP");
+        async function tryFreeipapi(ip) {
           try {
-            const data = await FluxHttpClient.get(`${GEO_API}/${ip}`, { fields: "countryCode,country,city,regionName" }, { cache: false, retries: 1 });
+            const freeipapiUrl = PROVIDERS[0]?.base ?? "https://freeipapi.com/api/json";
+            const data = await FluxHttpClient.get(`${freeipapiUrl}/${ip}`, {}, { cache: false, retries: 1 });
+            if (data !== null && typeof data === "object" && typeof data.countryCode === "string") {
+              const result = {
+                countryCode: data.countryCode,
+                country: typeof data.countryName === "string" ? data.countryName : data.countryCode,
+                city: typeof data.cityName === "string" ? data.cityName : null,
+                regionName: typeof data.regionName === "string" ? data.regionName : null
+              };
+              FluxLogger.debug("Geolocation", `freeipapi: ${ip} \u2192 ${result.city ?? result.country} (${result.countryCode})`);
+              return result;
+            }
+          } catch (e) {
+            FluxLogger.debug("Geolocation", `freeipapi failed for ${ip}: ${String(e)}`);
+          }
+          return null;
+        }
+        __name(tryFreeipapi, "tryFreeipapi");
+        async function tryIpApi(ip) {
+          try {
+            const ipApiUrl = PROVIDERS[1]?.base ?? "http://ip-api.com/json";
+            const data = await FluxHttpClient.get(`${ipApiUrl}/${ip}`, { fields: "countryCode,country,city,regionName" }, { cache: false, retries: 1 });
             if (data !== null && typeof data === "object" && typeof data.countryCode === "string") {
               const result = {
                 countryCode: data.countryCode,
@@ -1186,17 +1225,15 @@ GM_addStyle(`/* === CSS Custom Properties === */
                 city: typeof data.city === "string" ? data.city : null,
                 regionName: typeof data.regionName === "string" ? data.regionName : null
               };
-              CACHE.set(ip, { data: result, t: Date.now() });
-              FluxLogger.debug("Geolocation", `Resolved ${ip} \u2192 ${result.city ?? result.country} (${result.countryCode})`);
+              FluxLogger.debug("Geolocation", `ip-api: ${ip} \u2192 ${result.city ?? result.country} (${result.countryCode})`);
               return result;
             }
-            FluxLogger.warn("Geolocation", `No countryCode in response for ${ip}`);
           } catch (e) {
-            FluxLogger.warn("Geolocation", `Lookup failed for ${ip}: ${String(e)}`);
+            FluxLogger.debug("Geolocation", `ip-api failed for ${ip}: ${String(e)}`);
           }
           return null;
         }
-        __name(lookupIP, "lookupIP");
+        __name(tryIpApi, "tryIpApi");
         async function getRegionFromIP(ip) {
           const geo = await lookupIP(ip);
           if (geo !== null) {
