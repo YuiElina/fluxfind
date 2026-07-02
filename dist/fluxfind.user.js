@@ -2422,6 +2422,12 @@ GM_addStyle(`/* === CSS Custom Properties === */
             if (chunk === void 0) continue;
             const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(chunk, false);
             let resolvedInChunk = 0;
+            if (i === 0 && thumbs.length > 0) {
+              const first = thumbs[0];
+              if (first !== void 0) {
+                FluxLogger.info("ServerBrowser", `Raw API sample: requestId="${first.requestId}" token="${first.token}" imageUrl=${first.imageUrl ? "yes" : "none"}`);
+              }
+            }
             thumbs.forEach((t) => {
               if (t.imageUrl && t.requestId) {
                 const parts = t.requestId.split(":");
@@ -2439,6 +2445,17 @@ GM_addStyle(`/* === CSS Custom Properties === */
         }
         FluxLogger.timeEnd("thumbnail-fetch", "ServerBrowser");
         FluxLogger.info("ServerBrowser", `Thumbnail map built: ${String(thumbnailMap.size)}/${String(allTokens.length)} player tokens resolved`);
+        if (servers.length > 0) {
+          const firstServer = servers[0];
+          if (firstServer !== void 0) {
+            const rawTokens = firstServer.playerTokens.slice(0, 6);
+            const tokenReport = rawTokens.map((t) => {
+              const has = thumbnailMap.has(t);
+              return `${t.slice(0, 12)}...\u2192${has ? "\u2713" : "\u2717"}`;
+            });
+            FluxLogger.info("ServerBrowser", `Token lookup sample (first server): [${tokenReport.join(", ")}]`);
+          }
+        }
         const sampleServers = servers.slice(0, 5);
         const sampleReport = sampleServers.map((s) => {
           const total = s.playerTokens.length;

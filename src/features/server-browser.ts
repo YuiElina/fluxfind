@@ -98,6 +98,15 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
           if (chunk === undefined) continue;
           const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(chunk, false);
           let resolvedInChunk = 0;
+
+          // Diagnostic: dump first result's raw requestId and token on first batch
+          if (i === 0 && thumbs.length > 0) {
+            const first = thumbs[0];
+            if (first !== undefined) {
+              FluxLogger.info('ServerBrowser', `Raw API sample: requestId="${first.requestId}" token="${first.token}" imageUrl=${first.imageUrl ? 'yes' : 'none'}`);
+            }
+          }
+
           thumbs.forEach(t => {
             if (t.imageUrl && t.requestId) {
               const parts = t.requestId.split(':');
@@ -115,6 +124,19 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       }
       FluxLogger.timeEnd('thumbnail-fetch', 'ServerBrowser');
       FluxLogger.info('ServerBrowser', `Thumbnail map built: ${String(thumbnailMap.size)}/${String(allTokens.length)} player tokens resolved`);
+
+      // Diagnostic: log raw token comparison for first server
+      if (servers.length > 0) {
+        const firstServer = servers[0];
+        if (firstServer !== undefined) {
+          const rawTokens = firstServer.playerTokens.slice(0, 6);
+          const tokenReport = rawTokens.map(t => {
+            const has = thumbnailMap.has(t);
+            return `${t.slice(0, 12)}...→${has ? '✓' : '✗'}`;
+          });
+          FluxLogger.info('ServerBrowser', `Token lookup sample (first server): [${tokenReport.join(', ')}]`);
+        }
+      }
 
       // Diagnostic: log token→thumbnail resolution for first 5 servers
       const sampleServers = servers.slice(0, 5);
