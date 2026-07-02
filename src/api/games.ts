@@ -59,23 +59,18 @@ export const FluxGamesAPI = ((): {
         { headers: { 'User-Agent': 'Roblox/WinInet' }, retries: 2 }
       ) as Record<string, unknown>;
 
-      const js: Record<string, unknown> = (data.joinScript && typeof data.joinScript === 'object') ? data.joinScript as Record<string, unknown> : data;
-
-      // Debug: log all top-level keys to find correct endpoint field name
-      const topKeys = Object.keys(js).join(', ');
-      FluxLogger.info('GamesAPI', `Region [${sid}]: joinScript keys: [${topKeys}]`);
-
-      if (Object.keys(js).length === 0) {
-        FluxLogger.warn('GamesAPI', `Region [${sid}]: empty joinScript response`);
+      // Skip queue-status responses (joinScript is null → no server connection info)
+      if (data.joinScript === null || data.joinScript === undefined) {
         return { sid, result: null };
       }
 
-      // Dump raw JSON for first failure to diagnose renamed fields
-      if (!(js.UdmuxEndpoints ?? js.udmuxEndpoints ?? js.udmuxendpoints)) {
-        FluxLogger.warn('GamesAPI', `Region [${sid}]: raw joinScript: ${JSON.stringify(js).slice(0, 500)}`);
+      const js = data.joinScript as Record<string, unknown>;
+
+      if (Object.keys(js).length === 0) {
+        return { sid, result: null };
       }
 
-      const endpoints = (js.UdmuxEndpoints ?? js.udmuxEndpoints ?? js.udmuxendpoints ?? js.DirectEndpoint ?? js.ConnectionEndpoints) as { Address?: string; address?: string }[] | undefined;
+      const endpoints = (js.UdmuxEndpoints ?? js.udmuxEndpoints ?? js.udmuxendpoints ?? js.ServerConnections) as { Address?: string; address?: string }[] | undefined;
       if (endpoints === undefined || endpoints.length === 0) {
         FluxLogger.warn('GamesAPI', `Region [${sid}]: no UdmuxEndpoints in response`);
         return { sid, result: null };

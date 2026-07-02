@@ -2064,17 +2064,14 @@ GM_addStyle(`/* === CSS Custom Properties === */
           { placeId: FluxSanitizer.sanitizeUserId(gameId), gameId: sid },
           { headers: { "User-Agent": "Roblox/WinInet" }, retries: 2 }
         );
-        const js = data.joinScript && typeof data.joinScript === "object" ? data.joinScript : data;
-        const topKeys = Object.keys(js).join(", ");
-        FluxLogger.info("GamesAPI", `Region [${sid}]: joinScript keys: [${topKeys}]`);
-        if (Object.keys(js).length === 0) {
-          FluxLogger.warn("GamesAPI", `Region [${sid}]: empty joinScript response`);
+        if (data.joinScript === null || data.joinScript === void 0) {
           return { sid, result: null };
         }
-        if (!(js.UdmuxEndpoints ?? js.udmuxEndpoints ?? js.udmuxendpoints)) {
-          FluxLogger.warn("GamesAPI", `Region [${sid}]: raw joinScript: ${JSON.stringify(js).slice(0, 500)}`);
+        const js = data.joinScript;
+        if (Object.keys(js).length === 0) {
+          return { sid, result: null };
         }
-        const endpoints = js.UdmuxEndpoints ?? js.udmuxEndpoints ?? js.udmuxendpoints ?? js.DirectEndpoint ?? js.ConnectionEndpoints;
+        const endpoints = js.UdmuxEndpoints ?? js.udmuxEndpoints ?? js.udmuxendpoints ?? js.ServerConnections;
         if (endpoints === void 0 || endpoints.length === 0) {
           FluxLogger.warn("GamesAPI", `Region [${sid}]: no UdmuxEndpoints in response`);
           return { sid, result: null };
