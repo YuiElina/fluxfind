@@ -63,11 +63,16 @@ export const FluxGamesAPI = ((): {
 
       // Debug: log all top-level keys to find correct endpoint field name
       const topKeys = Object.keys(js).join(', ');
-      FluxLogger.debug('GamesAPI', `Region [${sid}]: joinScript keys: [${topKeys}]`);
+      FluxLogger.info('GamesAPI', `Region [${sid}]: joinScript keys: [${topKeys}]`);
 
       if (Object.keys(js).length === 0) {
         FluxLogger.warn('GamesAPI', `Region [${sid}]: empty joinScript response`);
         return { sid, result: null };
+      }
+
+      // Dump raw JSON for first failure to diagnose renamed fields
+      if (!(js.UdmuxEndpoints ?? js.udmuxEndpoints ?? js.udmuxendpoints)) {
+        FluxLogger.warn('GamesAPI', `Region [${sid}]: raw joinScript: ${JSON.stringify(js).slice(0, 500)}`);
       }
 
       const endpoints = (js.UdmuxEndpoints ?? js.udmuxEndpoints ?? js.udmuxendpoints ?? js.DirectEndpoint ?? js.ConnectionEndpoints) as { Address?: string; address?: string }[] | undefined;
