@@ -329,6 +329,39 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     return li;
   }
 
+    // Geographic proximity ranks: for each server-hosting country, an ordered list
+    // of same-region countries from closest to furthest.
+    // Uses the country codes from REGION_CHIPS as keys.
+    const PROXIMITY_RANK: Record<string, string[]> = {
+      // North America
+      US: ['US', 'CA', 'MX'],
+      // Europe
+      NL: ['NL', 'BE', 'LU', 'DE', 'GB', 'FR', 'DK', 'CH', 'AT', 'PL', 'CZ', 'SE', 'NO', 'IE', 'FI', 'ES', 'PT', 'IT', 'HU', 'RO', 'BG', 'HR', 'SI', 'RS', 'UA', 'LT', 'LV', 'EE', 'GR', 'TR'],
+      DE: ['DE', 'NL', 'BE', 'LU', 'CH', 'AT', 'DK', 'PL', 'CZ', 'FR', 'GB', 'SE', 'NO', 'IE', 'FI', 'ES', 'PT', 'IT', 'HU', 'RO', 'BG', 'HR', 'SI', 'RS', 'UA', 'LT', 'LV', 'EE', 'GR', 'TR'],
+      GB: ['GB', 'IE', 'NL', 'BE', 'LU', 'FR', 'DE', 'DK', 'NO', 'SE', 'CH', 'AT', 'PL', 'CZ', 'FI', 'ES', 'PT', 'IT', 'HU', 'RO', 'BG', 'HR', 'SI', 'RS', 'UA', 'LT', 'LV', 'EE', 'GR', 'TR'],
+      FR: ['FR', 'BE', 'LU', 'CH', 'NL', 'DE', 'GB', 'ES', 'IT', 'PT', 'AT', 'DK', 'IE', 'PL', 'CZ', 'NO', 'SE', 'FI', 'HU', 'RO', 'BG', 'HR', 'SI', 'RS', 'UA', 'LT', 'LV', 'EE', 'GR', 'TR'],
+      PL: ['PL', 'CZ', 'DE', 'AT', 'SK', 'HU', 'LT', 'LV', 'EE', 'UA', 'RO', 'BG', 'NL', 'BE', 'LU', 'DK', 'SE', 'GB', 'FR', 'NO', 'IE', 'FI', 'ES', 'PT', 'IT', 'HR', 'SI', 'RS', 'GR', 'TR'],
+      // Asia
+      HK: ['HK', 'CN', 'TW', 'SG', 'JP', 'KR', 'TH', 'VN', 'MY', 'PH', 'ID', 'IN'],
+      IN: ['IN', 'BD', 'LK', 'PK', 'SG', 'TH', 'MY', 'VN', 'HK', 'CN', 'JP', 'KR', 'TW', 'PH', 'ID'],
+      SG: ['SG', 'MY', 'TH', 'ID', 'VN', 'PH', 'HK', 'IN', 'JP', 'KR', 'TW', 'CN'],
+      JP: ['JP', 'KR', 'TW', 'CN', 'HK', 'PH', 'SG', 'TH', 'VN', 'MY', 'ID', 'IN'],
+      // Oceania
+      AU: ['AU', 'NZ', 'FJ', 'SG', 'JP', 'HK'],
+      // South America
+      BR: ['BR', 'AR', 'UY', 'PY', 'CL', 'BO', 'PE', 'CO', 'VE', 'EC'],
+    };
+
+    function getProximityScore(targetCC: string, serverCC: string): number {
+      if (targetCC === serverCC) return 0;
+      const rankList = PROXIMITY_RANK[targetCC];
+      if (rankList) {
+        const idx = rankList.indexOf(serverCC);
+        if (idx !== -1) return idx;
+      }
+      return 999;
+    }
+
   function applyRegionFilter(countryCode: string): void {
     regionFilterAtom.set(countryCode);
 
@@ -362,12 +395,14 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       return { server: s, priority };
     });
 
-    // Sort by priority, then by country code alphabetically, then by playing count descending
+    // Sort by priority, then by geographic proximity to target, then by playing count descending
     scored.sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
-      const aCC = a.server.region?.countryCode ?? '\uffff';
-      const bCC = b.server.region?.countryCode ?? '\uffff';
-      if (aCC !== bCC) return aCC.localeCompare(bCC);
+      const aCC = a.server.region?.countryCode ?? '';
+      const bCC = b.server.region?.countryCode ?? '';
+      const aProx = getProximityScore(countryCode, aCC);
+      const bProx = getProximityScore(countryCode, bCC);
+      if (aProx !== bProx) return aProx - bProx;
       return b.server.playing - a.server.playing;
     });
 
