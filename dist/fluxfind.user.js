@@ -1273,12 +1273,12 @@ GM_addStyle(`/* === CSS Custom Properties === */
             FluxLogger.debug("Geolocation", `Cache hit for ${ip}: ${cached.data.city ?? cached.data.country}`);
             return cached.data;
           }
-          let result = await tryFreeipapi(ip);
+          let result = await tryIpApi(ip);
           if (result !== null) {
             CACHE.set(ip, { data: result, t: Date.now() });
             return result;
           }
-          result = await tryIpApi(ip);
+          result = await tryFreeipapi(ip);
           if (result !== null) {
             CACHE.set(ip, { data: result, t: Date.now() });
             return result;
@@ -2255,7 +2255,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
         }
         for (const ep of endpoints) {
           const epIp = ep.Address ?? null;
-          if (epIp !== null && epIp !== "0.0.0.0" && !epIp.startsWith("10.") && !epIp.startsWith("127.") && !epIp.startsWith("192.168.")) {
+          if (epIp !== null && epIp !== "0.0.0.0" && !epIp.startsWith("10.") && !epIp.startsWith("127.") && !epIp.startsWith("192.168.") && !epIp.startsWith("172.")) {
             const geo = await Promise.resolve().then(() => (init_geolocation(), geolocation_exports)).then((m) => m.FluxGeolocationAPI.getRegionFromIP(epIp));
             if (geo.region !== null && typeof geo.region === "object") {
               const r = geo.region;
