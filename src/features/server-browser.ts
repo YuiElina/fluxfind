@@ -28,30 +28,37 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
   let displayedServers: ServerCard[] = [];
   let regionScanDone = false;
   let currentGameId = 0;
+  let scanning = false;
 
   function getMaxServerCount(): number {
     const fromAtom = serverFetchCountAtom.get();
     if (fromAtom > 0) return fromAtom;
-    return 50;
+    return 150;
   }
 
   async function scanAndCacheRegions(force = false): Promise<void> {
+    if (scanning) {
+      FluxLogger.info('ServerBrowser', 'Scan already in progress, skipping');
+      return;
+    }
     if (!force && regionScanDone) {
       FluxLogger.info('ServerBrowser', 'Region scan: already completed, skipping');
       return;
     }
+    scanning = true;
     regionScanDone = false;
     allServers = [];
 
     if (serverObserver) { serverObserver.disconnect(); serverObserver = null; }
 
+    const selectedCount = getMaxServerCount();
     const targetCountry = regionFilterAtom.get();
     const targetGroup = targetCountry ? FluxConstants.getCountryGroup(targetCountry) : null;
     const MIN_MATCHES = 10;
-    const MAX_PAGES = 3;
-    const PER_PAGE = 50; // servers to scan per page
+    const PER_PAGE = 100; // Roblox's real per-page cap
+    const MAX_PAGES = Math.ceil(selectedCount / PER_PAGE);
 
-    FluxLogger.info('ServerBrowser', `Region scan starting (target: ${targetCountry || 'none'}, min matches: ${String(MIN_MATCHES)}, max pages: ${String(MAX_PAGES)})`);
+    FluxLogger.info('ServerBrowser', `Region scan starting (target: ${targetCountry || 'none'}, min matches: ${String(MIN_MATCHES)}, max pages: ${String(MAX_PAGES)}, max servers: ${String(selectedCount)})`);
     FluxNotifications.show(`Scanning servers for ${targetCountry || 'all regions'}...`, 'info', 4000);
 
     let allFetchedServers: { id: string; maxPlayers: number; playing: number; playerTokens: string[] }[] = [];
@@ -62,7 +69,8 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
     // Leaky bucket: paginate until we have enough matches or hit the cap
     try {
-      FluxLogger.timeStart('server-fetch');
+      try {
+        FluxLogger.timeStart('server-fetch');
       for (let p = 0; p < MAX_PAGES; p++) {
         totalPages = p + 1;
         const page = await FluxGamesAPI.fetchPublicServersPage(currentGameId, 'Desc', PER_PAGE, cursor);
@@ -99,20 +107,20 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
         if (!cursor) break;
       }
-      FluxLogger.timeEnd('server-fetch', 'ServerBrowser');
-    } catch (e) {
-      FluxLogger.error('ServerBrowser', `Server fetch failed: ${String(e)}`);
-      FluxNotifications.show('Failed to fetch servers', 'error', 3000);
-      observeServerList();
-      return;
-    }
+        FluxLogger.timeEnd('server-fetch', 'ServerBrowser');
+      } catch (e) {
+        FluxLogger.error('ServerBrowser', `Server fetch failed: ${String(e)}`);
+        FluxNotifications.show('Failed to fetch servers', 'error', 3000);
+        observeServerList();
+        return;
+      }
 
-    if (allFetchedServers.length === 0) {
-      FluxLogger.warn('ServerBrowser', '0 servers returned from API');
-      FluxNotifications.show('No public servers found', 'warning', 3000);
-      observeServerList();
-      return;
-    }
+      if (allFetchedServers.length === 0) {
+        FluxLogger.warn('ServerBrowser', '0 servers returned from API');
+        FluxNotifications.show('No public servers found', 'warning', 3000);
+        observeServerList();
+        return;
+      }
 
       FluxLogger.info('ServerBrowser', `Scan complete: ${String(allFetchedServers.length)} servers across ${String(totalPages)} page(s), ${String(regionMap.size)} regions resolved`);
 
@@ -179,7 +187,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       FluxLogger.info('ServerBrowser', `Token resolution sample: [${sampleReport.join('] [')}]`);
     }
 
-    allServers = allFetchedServers.slice(0, 150).map(s => ({
+      allServers = allFetchedServers.slice(0, selectedCount).map(s => ({
       id: s.id,
       playing: s.playing,
       maxPlayers: s.maxPlayers,
@@ -192,17 +200,20 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     const withoutRegion = allServers.length - withRegion;
     FluxLogger.info('ServerBrowser', `Servers ready: ${String(allServers.length)} total (${String(withRegion)} with region, ${String(withoutRegion)} without)`);
 
-    regionScanDone = true;
+      regionScanDone = true;
 
-    const savedRegion = regionFilterAtom.get();
-    if (savedRegion) {
-      FluxLogger.info('ServerBrowser', `Applying saved region filter: "${savedRegion}"`);
-      applyRegionFilter(savedRegion);
-    } else {
-      FluxLogger.info('ServerBrowser', 'No saved region filter, rendering all servers');
-      renderServerCards(allServers);
+      const savedRegion = regionFilterAtom.get();
+      if (savedRegion) {
+        FluxLogger.info('ServerBrowser', `Applying saved region filter: "${savedRegion}"`);
+        applyRegionFilter(savedRegion);
+      } else {
+        FluxLogger.info('ServerBrowser', 'No saved region filter, rendering all servers');
+        renderServerCards(allServers);
+      }
+      observeServerList();
+    } finally {
+      scanning = false;
     }
-    observeServerList();
   }
 
   function renderServerCards(servers: ServerCard[]): void {
@@ -407,7 +418,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     FluxLogger.info('ServerBrowser', 'Manual refresh triggered');
     allServers = [];
     regionScanDone = false;
-    void scanAndCacheRegions();
+    void scanAndCacheRegions(true);
   }
 
   function openFilterPanel(): void {
