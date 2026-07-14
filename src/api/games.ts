@@ -102,7 +102,7 @@ export const FluxGamesAPI = ((): {
     const results = new Map<string, RegionResult>();
     let success = 0;
     let failed = 0;
-    const CHUNK_SIZE = 5;
+    const CHUNK_SIZE = 10;
 
     FluxLogger.info('GamesAPI', `Region scan: ${String(serverIds.length)} servers in chunks of ${String(CHUNK_SIZE)}`);
     FluxLogger.timeStart('region-scan');
@@ -116,7 +116,7 @@ export const FluxGamesAPI = ((): {
       const chunk = chunks[ci];
       if (chunk === undefined) continue;
 
-      if (ci > 0) await new Promise(r => setTimeout(r, 250));
+      if (ci > 0) await new Promise(r => setTimeout(r, 100));
 
       const settled = await Promise.allSettled(chunk.map(sid => fetchSingleRegion(gameId, sid)));
 

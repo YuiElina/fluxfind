@@ -362,9 +362,12 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
       return { server: s, priority };
     });
 
-    // Sort by priority, then by playing count descending as tiebreaker
+    // Sort by priority, then by country code alphabetically, then by playing count descending
     scored.sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
+      const aCC = a.server.region?.countryCode ?? '\uffff';
+      const bCC = b.server.region?.countryCode ?? '\uffff';
+      if (aCC !== bCC) return aCC.localeCompare(bCC);
       return b.server.playing - a.server.playing;
     });
 
@@ -423,7 +426,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
     FluxModals.custom((modal, close) => {
       const currentCc = regionFilterAtom.get();
       const currentCount = getMaxServerCount();
-      const countOptions = [30, 50, 100, 200, 300];
+      const countOptions = [30, 50, 100, 200, 300, 500, 1000];
 
       let groupsHTML = '';
       FluxConstants.REGION_CHIPS.forEach(group => {
