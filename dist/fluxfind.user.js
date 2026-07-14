@@ -2593,7 +2593,6 @@ GM_addStyle(`/* === CSS Custom Properties === */
       FluxNotifications.show(`Scanning servers for ${targetCountry || "all regions"}...`, "info", 4e3);
       let allFetchedServers = [];
       const regionMap = /* @__PURE__ */ new Map();
-      let matchedCount = 0;
       let cursor = null;
       let totalPages = 0;
       try {
@@ -2612,21 +2611,22 @@ GM_addStyle(`/* === CSS Custom Properties === */
               regionMap.set(sid, region);
             });
             if (targetCountry) {
-              matchedCount = 0;
+              let exactMatches = 0;
+              let groupMatches = 0;
               allFetchedServers.forEach((s) => {
                 const r = regionMap.get(s.id);
                 if (!r) return;
                 if (r.countryCode === targetCountry) {
-                  matchedCount++;
+                  exactMatches++;
                   return;
                 }
                 if (targetGroup && FluxConstants.getCountryGroup(r.countryCode) === targetGroup) {
-                  matchedCount++;
+                  groupMatches++;
                 }
               });
-              FluxLogger.info("ServerBrowser", `Match count: ${String(matchedCount)}/${String(allFetchedServers.length)} (need ${String(MIN_MATCHES)})`);
-              if (matchedCount >= MIN_MATCHES) {
-                FluxLogger.info("ServerBrowser", `Enough matches found (${String(matchedCount)}), stopping pagination`);
+              FluxLogger.info("ServerBrowser", `Match count: ${String(exactMatches)} exact + ${String(groupMatches)} same-group / ${String(allFetchedServers.length)} total (need ${String(MIN_MATCHES)} exact)`);
+              if (exactMatches >= MIN_MATCHES) {
+                FluxLogger.info("ServerBrowser", `Enough exact matches found (${String(exactMatches)}), stopping pagination`);
                 break;
               }
             } else {
