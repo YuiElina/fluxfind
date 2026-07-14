@@ -61,7 +61,6 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
     let allFetchedServers: { id: string; maxPlayers: number; playing: number; playerTokens: string[] }[] = [];
     const regionMap = new Map<string, { city: string | null; country: string; countryCode: string }>();
-    let matchedCount = 0;
     let cursor: string | null = null;
     let totalPages = 0;
 
@@ -85,17 +84,18 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
 
         // Count matches
         if (targetCountry) {
-          matchedCount = 0;
+          let exactMatches = 0;
+          let groupMatches = 0;
           allFetchedServers.forEach(s => {
             const r = regionMap.get(s.id);
             if (!r) return;
-            if (r.countryCode === targetCountry) { matchedCount++; return; }
-            if (targetGroup && FluxConstants.getCountryGroup(r.countryCode) === targetGroup) { matchedCount++; }
+            if (r.countryCode === targetCountry) { exactMatches++; return; }
+            if (targetGroup && FluxConstants.getCountryGroup(r.countryCode) === targetGroup) { groupMatches++; }
           });
-          FluxLogger.info('ServerBrowser', `Match count: ${String(matchedCount)}/${String(allFetchedServers.length)} (need ${String(MIN_MATCHES)})`);
+          FluxLogger.info('ServerBrowser', `Match count: ${String(exactMatches)} exact + ${String(groupMatches)} same-group / ${String(allFetchedServers.length)} total (need ${String(MIN_MATCHES)} exact)`);
 
-          if (matchedCount >= MIN_MATCHES) {
-            FluxLogger.info('ServerBrowser', `Enough matches found (${String(matchedCount)}), stopping pagination`);
+          if (exactMatches >= MIN_MATCHES) {
+            FluxLogger.info('ServerBrowser', `Enough exact matches found (${String(exactMatches)}), stopping pagination`);
             break;
           }
         } else {
