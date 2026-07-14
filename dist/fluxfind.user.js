@@ -2277,7 +2277,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
       const results = /* @__PURE__ */ new Map();
       let success = 0;
       let failed = 0;
-      const CHUNK_SIZE = 5;
+      const CHUNK_SIZE = 10;
       FluxLogger.info("GamesAPI", `Region scan: ${String(serverIds.length)} servers in chunks of ${String(CHUNK_SIZE)}`);
       FluxLogger.timeStart("region-scan");
       const chunks = [];
@@ -2287,7 +2287,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
       for (let ci = 0; ci < chunks.length; ci++) {
         const chunk = chunks[ci];
         if (chunk === void 0) continue;
-        if (ci > 0) await new Promise((r) => setTimeout(r, 250));
+        if (ci > 0) await new Promise((r) => setTimeout(r, 100));
         const settled = await Promise.allSettled(chunk.map((sid) => fetchSingleRegion(gameId, sid)));
         const retryIds = [];
         for (const s of settled) {
@@ -2865,6 +2865,9 @@ GM_addStyle(`/* === CSS Custom Properties === */
       });
       scored.sort((a, b) => {
         if (a.priority !== b.priority) return a.priority - b.priority;
+        const aCC = a.server.region?.countryCode ?? "\uFFFF";
+        const bCC = b.server.region?.countryCode ?? "\uFFFF";
+        if (aCC !== bCC) return aCC.localeCompare(bCC);
         return b.server.playing - a.server.playing;
       });
       const sorted = scored.map((s) => s.server);
@@ -2921,7 +2924,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
       FluxModals.custom((modal, close) => {
         const currentCc = regionFilterAtom.get();
         const currentCount = getMaxServerCount();
-        const countOptions = [30, 50, 100, 200, 300];
+        const countOptions = [30, 50, 100, 200, 300, 500, 1e3];
         let groupsHTML = "";
         FluxConstants.REGION_CHIPS.forEach((group) => {
           let groupChips = "";
