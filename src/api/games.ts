@@ -78,7 +78,7 @@ export const FluxGamesAPI = ((): {
 
       for (const ep of endpoints) {
         const epIp = ep.Address ?? null;
-        if (epIp !== null && epIp !== '0.0.0.0' && !epIp.startsWith('10.') && !epIp.startsWith('127.') && !epIp.startsWith('192.168.')) {
+        if (epIp !== null && epIp !== '0.0.0.0' && !epIp.startsWith('10.') && !epIp.startsWith('127.') && !epIp.startsWith('192.168.') && !epIp.startsWith('172.')) {
           const geo = await import('./geolocation').then(m => m.FluxGeolocationAPI.getRegionFromIP(epIp));
           if (geo.region !== null && typeof geo.region === 'object') {
             const r = geo.region as RegionResult;

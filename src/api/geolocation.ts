@@ -27,15 +27,15 @@ export const FluxGeolocationAPI = ((): {
       return cached.data;
     }
 
-    // Try freeipapi.com first (no rate limits)
-    let result = await tryFreeipapi(ip);
+    // Try ip-api.com first (more accurate for Roblox datacenter IPs)
+    let result = await tryIpApi(ip);
     if (result !== null) {
       CACHE.set(ip, { data: result, t: Date.now() });
       return result;
     }
 
-    // Try ip-api.com
-    result = await tryIpApi(ip);
+    // Fall back to freeipapi.com
+    result = await tryFreeipapi(ip);
     if (result !== null) {
       CACHE.set(ip, { data: result, t: Date.now() });
       return result;
