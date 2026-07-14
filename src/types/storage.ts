@@ -18,6 +18,7 @@ export type SettingKey =
   | 'autoserverregions'
   | 'autoserverregionnumber'
   | 'serverregionfilter'
+  | 'serverfetchcount'
   | 'version'
   | '_legacy_migrated';
 

@@ -37,14 +37,18 @@ export const FluxModals = ((): { custom: (builder: (modal: HTMLElement, close: (
     modal.className = 'ff-modal ff-modal-custom ff-modal-pop';
     modal.style.maxWidth = '520px';
     modal.style.width = '90%';
-    modal.style.background = '#2a2a2a';
     modal.style.borderRadius = '12px';
-    modal.style.border = '1px solid #404040';
     modal.style.overflowY = 'auto';
     modal.style.maxHeight = '85vh';
-    modal.style.color = '#e8e8e8';
+
+    function backdropHandler(e: Event): void {
+      if (e.target === overlay) {
+        close();
+      }
+    }
 
     function close(): void {
+      overlay.removeEventListener('click', backdropHandler);
       modal.classList.add('ff-modal-closing');
       setTimeout(() => {
         if (modal.isConnected) modal.remove();
@@ -53,12 +57,7 @@ export const FluxModals = ((): { custom: (builder: (modal: HTMLElement, close: (
       }, 200);
     }
 
-    overlay.addEventListener('click', function handler(e: Event): void {
-      if (e.target === overlay) {
-        close();
-        overlay.removeEventListener('click', handler);
-      }
-    });
+    overlay.addEventListener('click', backdropHandler);
 
     builder(modal, close);
     overlay.appendChild(modal);

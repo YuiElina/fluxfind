@@ -1,4 +1,5 @@
 import { FluxLogger } from '../core/logger';
+import { FluxUtils } from '../core/utils';
 
 interface ThumbResult { requestId: string; token: string; imageUrl: string | null; targetId: number; state: string }
 
@@ -61,44 +62,56 @@ export const FluxThumbnailsAPI = ((): {
         return;
       }
 
-      function attempt(): void {
-        GM_xmlhttpRequest({
-          method: 'POST',
-          url,
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          data: JSON.stringify(body),
-          anonymous: false,
-          timeout: 15000,
-          onload: function (response: GM_XHRResponse) {
-            if (response.status === 429) {
-              FluxLogger.debug('Thumbnails', 'Rate limited (429), retrying after 500ms...');
-              setTimeout(attempt, 500);
-              return;
-            }
-            if (response.status >= 200 && response.status < 300) {
-              try {
-                resolve(JSON.parse(response.responseText) as { data?: unknown });
-              } catch {
-                FluxLogger.warn('Thumbnails', 'Failed to parse batch response');
-                resolve({});
+      // Wrap the GM_xmlhttpRequest call in a retryable promise so that 429
+      // responses get exponential backoff via FluxUtils.retry.  Previous
+      // behaviour silently swallowed all failures (resolving {}); this now
+      // throws after exhausting retries on 429, which is safe because the
+      // sole caller (fetchPlayerThumbnailsByTokens) is already wrapped in a
+      // try/catch inside scanAndCacheRegions's batch loop.
+      function doRequest(): Promise<{ data?: unknown }> {
+        return new Promise((reqResolve, reqReject) => {
+          GM_xmlhttpRequest({
+            method: 'POST',
+            url,
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            data: JSON.stringify(body),
+            anonymous: false,
+            timeout: 15000,
+            onload: function (response: GM_XHRResponse) {
+              if (response.status === 429) {
+                FluxLogger.debug('Thumbnails', 'Rate limited (429), will retry with backoff...');
+                reqReject(new Error('RATE_LIMITED'));
+                return;
               }
-            } else {
-              FluxLogger.warn('Thumbnails', `HTTP ${String(response.status)} from thumbnail API`);
-              resolve({});
-            }
-          },
-          onerror: function () {
-            FluxLogger.warn('Thumbnails', 'Network error on thumbnail batch request');
-            resolve({});
-          },
-          ontimeout: function () {
-            FluxLogger.warn('Thumbnails', 'Timeout on thumbnail batch request');
-            resolve({});
-          },
+              if (response.status >= 200 && response.status < 300) {
+                try {
+                  reqResolve(JSON.parse(response.responseText) as { data?: unknown });
+                } catch {
+                  FluxLogger.warn('Thumbnails', 'Failed to parse batch response');
+                  reqResolve({});
+                }
+              } else {
+                FluxLogger.warn('Thumbnails', `HTTP ${String(response.status)} from thumbnail API`);
+                reqResolve({});
+              }
+            },
+            onerror: function () {
+              FluxLogger.warn('Thumbnails', 'Network error on thumbnail batch request');
+              reqResolve({});
+            },
+            ontimeout: function () {
+              FluxLogger.warn('Thumbnails', 'Timeout on thumbnail batch request');
+              reqResolve({});
+            },
+          });
         });
       }
 
-      attempt();
+      // Use FluxUtils.retry for exponential backoff on 429 (0.5s → 1s → 2s, max 3 retries).
+      // Non-429 failures resolve {} as before, so retry is only triggered for rate limits.
+      FluxUtils.retry(doRequest, 3, 500)
+        .then(resolve)
+        .catch(() => { resolve({}); });
     });
   }
 

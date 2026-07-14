@@ -837,7 +837,9 @@ GM_addStyle(`/* === CSS Custom Properties === */
           disablechat: false,
           smallerrobloxsidebar: false,
           autoserverregions: true,
-          autoserverregionnumber: 16
+          autoserverregionnumber: 16,
+          serverfetchcount: 150,
+          serverregionfilter: ""
         };
         const URL_PATTERNS = {
           GAME_PAGE: /^\/games\/(\d+)/,
@@ -1674,13 +1676,14 @@ GM_addStyle(`/* === CSS Custom Properties === */
       moon: svg({}, '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'),
       sun: svg({}, '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'),
       layout: svg({}, '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="9" x2="9" y1="3" y2="21"/>'),
-      pallete: svg({}, '<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="9.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+      palette: svg({}, '<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="9.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
       monitor: svg({}, '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>'),
       heart: svg({}, '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>'),
       star: svg({}, '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'),
       clock: svg({}, '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'),
       shield: svg({}, '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
-      flag: svg({}, '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>')
+      flag: svg({}, '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>'),
+      barChart: svg({}, '<line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>')
     };
     function get(name, opts = {}) {
       const { size = 18, className = "", color = "" } = opts;
@@ -1780,13 +1783,17 @@ GM_addStyle(`/* === CSS Custom Properties === */
       modal.className = "ff-modal ff-modal-custom ff-modal-pop";
       modal.style.maxWidth = "520px";
       modal.style.width = "90%";
-      modal.style.background = "#2a2a2a";
       modal.style.borderRadius = "12px";
-      modal.style.border = "1px solid #404040";
       modal.style.overflowY = "auto";
       modal.style.maxHeight = "85vh";
-      modal.style.color = "#e8e8e8";
+      function backdropHandler(e) {
+        if (e.target === overlay) {
+          close();
+        }
+      }
+      __name(backdropHandler, "backdropHandler");
       function close() {
+        overlay.removeEventListener("click", backdropHandler);
         modal.classList.add("ff-modal-closing");
         setTimeout(() => {
           if (modal.isConnected) modal.remove();
@@ -1795,12 +1802,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
         }, 200);
       }
       __name(close, "close");
-      overlay.addEventListener("click", /* @__PURE__ */ __name(function handler(e) {
-        if (e.target === overlay) {
-          close();
-          overlay.removeEventListener("click", handler);
-        }
-      }, "handler"));
+      overlay.addEventListener("click", backdropHandler);
       builder(modal, close);
       overlay.appendChild(modal);
     }
@@ -1845,9 +1847,12 @@ GM_addStyle(`/* === CSS Custom Properties === */
       for (const ad of ads) {
         const el = ad;
         const prevDisplay = el.style.display;
+        const textSnippet = el.textContent.trim().slice(0, 80) || "(no text)";
+        const dataAttrs = Array.from(el.attributes).filter((a) => a.name.startsWith("data-")).map((a) => `${a.name}=${JSON.stringify(a.value)}`).join(" ");
+        const extra = dataAttrs ? ` [${dataAttrs}]` : "";
         el.remove();
         removed++;
-        FluxLogger.debug("AdRemover", `Removed ad element: ${el.tagName}.${el.className.split(" ")[0] ?? "?"} (was ${prevDisplay || "visible"})`);
+        FluxLogger.debug("AdRemover", `Removed ad element: ${el.tagName}.${el.className.split(" ")[0] ?? "?"} text="${textSnippet}"${extra} (was ${prevDisplay || "visible"})`);
       }
       if (removed > 0) {
         blockedSession += removed;
@@ -1947,7 +1952,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
   var smartSearchAtom = createAtom("smartsearch", true);
   var debugLogsAtom = createAtom("enableLogs", false);
   var regionFilterAtom = createAtom("serverregionfilter", "");
-  var serverFetchCountAtom = createAtom("serverfetchcount", 50);
+  var serverFetchCountAtom = createAtom("serverfetchcount", 150);
 
   // src/ui/settings-panel.ts
   var TABS = [
@@ -2392,6 +2397,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
 
   // src/api/thumbnails.ts
   init_logger();
+  init_utils();
   var FluxThumbnailsAPI = (() => {
     "use strict";
     const THUMBNAILS_API = "https://thumbnails.roblox.com/v1";
@@ -2435,44 +2441,48 @@ GM_addStyle(`/* === CSS Custom Properties === */
           });
           return;
         }
-        function attempt() {
-          GM_xmlhttpRequest({
-            method: "POST",
-            url,
-            headers: { "Content-Type": "application/json", "Accept": "application/json" },
-            data: JSON.stringify(body),
-            anonymous: false,
-            timeout: 15e3,
-            onload: /* @__PURE__ */ __name(function(response) {
-              if (response.status === 429) {
-                FluxLogger.debug("Thumbnails", "Rate limited (429), retrying after 500ms...");
-                setTimeout(attempt, 500);
-                return;
-              }
-              if (response.status >= 200 && response.status < 300) {
-                try {
-                  resolve(JSON.parse(response.responseText));
-                } catch {
-                  FluxLogger.warn("Thumbnails", "Failed to parse batch response");
-                  resolve({});
+        function doRequest() {
+          return new Promise((reqResolve, reqReject) => {
+            GM_xmlhttpRequest({
+              method: "POST",
+              url,
+              headers: { "Content-Type": "application/json", "Accept": "application/json" },
+              data: JSON.stringify(body),
+              anonymous: false,
+              timeout: 15e3,
+              onload: /* @__PURE__ */ __name(function(response) {
+                if (response.status === 429) {
+                  FluxLogger.debug("Thumbnails", "Rate limited (429), will retry with backoff...");
+                  reqReject(new Error("RATE_LIMITED"));
+                  return;
                 }
-              } else {
-                FluxLogger.warn("Thumbnails", `HTTP ${String(response.status)} from thumbnail API`);
-                resolve({});
-              }
-            }, "onload"),
-            onerror: /* @__PURE__ */ __name(function() {
-              FluxLogger.warn("Thumbnails", "Network error on thumbnail batch request");
-              resolve({});
-            }, "onerror"),
-            ontimeout: /* @__PURE__ */ __name(function() {
-              FluxLogger.warn("Thumbnails", "Timeout on thumbnail batch request");
-              resolve({});
-            }, "ontimeout")
+                if (response.status >= 200 && response.status < 300) {
+                  try {
+                    reqResolve(JSON.parse(response.responseText));
+                  } catch {
+                    FluxLogger.warn("Thumbnails", "Failed to parse batch response");
+                    reqResolve({});
+                  }
+                } else {
+                  FluxLogger.warn("Thumbnails", `HTTP ${String(response.status)} from thumbnail API`);
+                  reqResolve({});
+                }
+              }, "onload"),
+              onerror: /* @__PURE__ */ __name(function() {
+                FluxLogger.warn("Thumbnails", "Network error on thumbnail batch request");
+                reqResolve({});
+              }, "onerror"),
+              ontimeout: /* @__PURE__ */ __name(function() {
+                FluxLogger.warn("Thumbnails", "Timeout on thumbnail batch request");
+                reqResolve({});
+              }, "ontimeout")
+            });
           });
         }
-        __name(attempt, "attempt");
-        attempt();
+        __name(doRequest, "doRequest");
+        FluxUtils.retry(doRequest, 3, 500).then(resolve).catch(() => {
+          resolve({});
+        });
       });
     }
     __name(gmPost, "gmPost");
@@ -2552,29 +2562,34 @@ GM_addStyle(`/* === CSS Custom Properties === */
     let displayedServers = [];
     let regionScanDone = false;
     let currentGameId = 0;
+    let scanning = false;
     function getMaxServerCount() {
-      const fromAtom = serverFetchCountAtom.get();
-      if (fromAtom > 0) return fromAtom;
-      return 50;
+      return serverFetchCountAtom.get();
     }
     __name(getMaxServerCount, "getMaxServerCount");
     async function scanAndCacheRegions(force = false) {
+      if (scanning) {
+        FluxLogger.info("ServerBrowser", "Scan already in progress, skipping");
+        return;
+      }
       if (!force && regionScanDone) {
         FluxLogger.info("ServerBrowser", "Region scan: already completed, skipping");
         return;
       }
+      scanning = true;
       regionScanDone = false;
       allServers = [];
       if (serverObserver) {
         serverObserver.disconnect();
         serverObserver = null;
       }
+      const selectedCount = getMaxServerCount();
       const targetCountry = regionFilterAtom.get();
       const targetGroup = targetCountry ? FluxConstants.getCountryGroup(targetCountry) : null;
       const MIN_MATCHES = 10;
-      const MAX_PAGES = 3;
-      const PER_PAGE = 50;
-      FluxLogger.info("ServerBrowser", `Region scan starting (target: ${targetCountry || "none"}, min matches: ${String(MIN_MATCHES)}, max pages: ${String(MAX_PAGES)})`);
+      const PER_PAGE = 100;
+      const MAX_PAGES = Math.ceil(selectedCount / PER_PAGE);
+      FluxLogger.info("ServerBrowser", `Region scan starting (target: ${targetCountry || "none"}, min matches: ${String(MIN_MATCHES)}, max pages: ${String(MAX_PAGES)}, max servers: ${String(selectedCount)})`);
       FluxNotifications.show(`Scanning servers for ${targetCountry || "all regions"}...`, "info", 4e3);
       let allFetchedServers = [];
       const regionMap = /* @__PURE__ */ new Map();
@@ -2582,138 +2597,142 @@ GM_addStyle(`/* === CSS Custom Properties === */
       let cursor = null;
       let totalPages = 0;
       try {
-        FluxLogger.timeStart("server-fetch");
-        for (let p = 0; p < MAX_PAGES; p++) {
-          totalPages = p + 1;
-          const page = await FluxGamesAPI.fetchPublicServersPage(currentGameId, "Desc", PER_PAGE, cursor);
-          if (page.servers.length === 0) break;
-          allFetchedServers = allFetchedServers.concat(page.servers);
-          cursor = page.nextCursor;
-          FluxLogger.info("ServerBrowser", `Page ${String(totalPages)}: ${String(page.servers.length)} servers (total: ${String(allFetchedServers.length)})`);
-          const idsToScan = page.servers.map((s) => s.id);
-          const pageRegions = await FluxGamesAPI.fetchServerRegions(currentGameId, idsToScan);
-          pageRegions.forEach((region, sid) => {
-            regionMap.set(sid, region);
-          });
-          if (targetCountry) {
-            matchedCount = 0;
-            allFetchedServers.forEach((s) => {
-              const r = regionMap.get(s.id);
-              if (!r) return;
-              if (r.countryCode === targetCountry) {
-                matchedCount++;
-                return;
-              }
-              if (targetGroup && FluxConstants.getCountryGroup(r.countryCode) === targetGroup) {
-                matchedCount++;
-              }
+        try {
+          FluxLogger.timeStart("server-fetch");
+          for (let p = 0; p < MAX_PAGES; p++) {
+            totalPages = p + 1;
+            const page = await FluxGamesAPI.fetchPublicServersPage(currentGameId, "Desc", PER_PAGE, cursor);
+            if (page.servers.length === 0) break;
+            allFetchedServers = allFetchedServers.concat(page.servers);
+            cursor = page.nextCursor;
+            FluxLogger.info("ServerBrowser", `Page ${String(totalPages)}: ${String(page.servers.length)} servers (total: ${String(allFetchedServers.length)})`);
+            const idsToScan = page.servers.map((s) => s.id);
+            const pageRegions = await FluxGamesAPI.fetchServerRegions(currentGameId, idsToScan);
+            pageRegions.forEach((region, sid) => {
+              regionMap.set(sid, region);
             });
-            FluxLogger.info("ServerBrowser", `Match count: ${String(matchedCount)}/${String(allFetchedServers.length)} (need ${String(MIN_MATCHES)})`);
-            if (matchedCount >= MIN_MATCHES) {
-              FluxLogger.info("ServerBrowser", `Enough matches found (${String(matchedCount)}), stopping pagination`);
+            if (targetCountry) {
+              matchedCount = 0;
+              allFetchedServers.forEach((s) => {
+                const r = regionMap.get(s.id);
+                if (!r) return;
+                if (r.countryCode === targetCountry) {
+                  matchedCount++;
+                  return;
+                }
+                if (targetGroup && FluxConstants.getCountryGroup(r.countryCode) === targetGroup) {
+                  matchedCount++;
+                }
+              });
+              FluxLogger.info("ServerBrowser", `Match count: ${String(matchedCount)}/${String(allFetchedServers.length)} (need ${String(MIN_MATCHES)})`);
+              if (matchedCount >= MIN_MATCHES) {
+                FluxLogger.info("ServerBrowser", `Enough matches found (${String(matchedCount)}), stopping pagination`);
+                break;
+              }
+            } else {
               break;
             }
-          } else {
-            break;
+            if (!cursor) break;
           }
-          if (!cursor) break;
+          FluxLogger.timeEnd("server-fetch", "ServerBrowser");
+        } catch (e) {
+          FluxLogger.error("ServerBrowser", `Server fetch failed: ${String(e)}`);
+          FluxNotifications.show("Failed to fetch servers", "error", 3e3);
+          observeServerList();
+          return;
         }
-        FluxLogger.timeEnd("server-fetch", "ServerBrowser");
-      } catch (e) {
-        FluxLogger.error("ServerBrowser", `Server fetch failed: ${String(e)}`);
-        FluxNotifications.show("Failed to fetch servers", "error", 3e3);
-        observeServerList();
-        return;
-      }
-      if (allFetchedServers.length === 0) {
-        FluxLogger.warn("ServerBrowser", "0 servers returned from API");
-        FluxNotifications.show("No public servers found", "warning", 3e3);
-        observeServerList();
-        return;
-      }
-      FluxLogger.info("ServerBrowser", `Scan complete: ${String(allFetchedServers.length)} servers across ${String(totalPages)} page(s), ${String(regionMap.size)} regions resolved`);
-      const allTokens = [];
-      const tokenSet = /* @__PURE__ */ new Set();
-      allFetchedServers.forEach((s) => {
-        s.playerTokens.forEach((t) => {
-          if (!tokenSet.has(t)) {
-            tokenSet.add(t);
-            allTokens.push(t);
-          }
-        });
-      });
-      FluxLogger.info("ServerBrowser", `Unique player tokens to resolve: ${String(allTokens.length)}`);
-      const thumbnailMap = /* @__PURE__ */ new Map();
-      if (allTokens.length > 0) {
-        const chunks = FluxUtils.chunk(allTokens, 100);
-        FluxLogger.info("ServerBrowser", `Fetching thumbnails in ${String(chunks.length)} batch(es)`);
-        FluxLogger.timeStart("thumbnail-fetch");
-        for (let i = 0; i < chunks.length; i++) {
-          try {
-            const chunk = chunks[i];
-            if (chunk === void 0) continue;
-            const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(chunk, false);
-            let resolvedInChunk = 0;
-            if (i === 0 && thumbs.length > 0) {
-              const first = thumbs[0];
-              if (first !== void 0) {
-                FluxLogger.info("ServerBrowser", `Raw API sample: requestId="${first.requestId}" token="${first.token}" imageUrl=${first.imageUrl ? "yes" : "none"}`);
-              }
+        if (allFetchedServers.length === 0) {
+          FluxLogger.warn("ServerBrowser", "0 servers returned from API");
+          FluxNotifications.show("No public servers found", "warning", 3e3);
+          observeServerList();
+          return;
+        }
+        FluxLogger.info("ServerBrowser", `Scan complete: ${String(allFetchedServers.length)} servers across ${String(totalPages)} page(s), ${String(regionMap.size)} regions resolved`);
+        const allTokens = [];
+        const tokenSet = /* @__PURE__ */ new Set();
+        allFetchedServers.forEach((s) => {
+          s.playerTokens.forEach((t) => {
+            if (!tokenSet.has(t)) {
+              tokenSet.add(t);
+              allTokens.push(t);
             }
-            thumbs.forEach((t) => {
-              if (t.imageUrl && t.requestId) {
-                const parts = t.requestId.split(":");
-                if (parts.length >= 2 && parts[1] !== void 0) {
-                  thumbnailMap.set(parts[1], t.imageUrl);
-                  resolvedInChunk++;
+          });
+        });
+        FluxLogger.info("ServerBrowser", `Unique player tokens to resolve: ${String(allTokens.length)}`);
+        const thumbnailMap = /* @__PURE__ */ new Map();
+        if (allTokens.length > 0) {
+          const chunks = FluxUtils.chunk(allTokens, 100);
+          FluxLogger.info("ServerBrowser", `Fetching thumbnails in ${String(chunks.length)} batch(es)`);
+          FluxLogger.timeStart("thumbnail-fetch");
+          for (let i = 0; i < chunks.length; i++) {
+            try {
+              const chunk = chunks[i];
+              if (chunk === void 0) continue;
+              const thumbs = await FluxThumbnailsAPI.fetchPlayerThumbnailsByTokens(chunk, false);
+              let resolvedInChunk = 0;
+              if (i === 0 && thumbs.length > 0) {
+                const first = thumbs[0];
+                if (first !== void 0) {
+                  FluxLogger.info("ServerBrowser", `Raw API sample: requestId="${first.requestId}" token="${first.token}" imageUrl=${first.imageUrl ? "yes" : "none"}`);
                 }
               }
-            });
-            FluxLogger.debug("ServerBrowser", `Thumbnail batch ${String(i + 1)}/${String(chunks.length)}: ${String(resolvedInChunk)} resolved out of ${String(chunk.length)} tokens`);
-          } catch (e) {
-            FluxLogger.warn("ServerBrowser", `Thumbnail batch ${String(i + 1)}/${String(chunks.length)} failed: ${String(e)}`);
+              thumbs.forEach((t) => {
+                if (t.imageUrl && t.requestId) {
+                  const parts = t.requestId.split(":");
+                  if (parts.length >= 2 && parts[1] !== void 0) {
+                    thumbnailMap.set(parts[1], t.imageUrl);
+                    resolvedInChunk++;
+                  }
+                }
+              });
+              FluxLogger.debug("ServerBrowser", `Thumbnail batch ${String(i + 1)}/${String(chunks.length)}: ${String(resolvedInChunk)} resolved out of ${String(chunk.length)} tokens`);
+            } catch (e) {
+              FluxLogger.warn("ServerBrowser", `Thumbnail batch ${String(i + 1)}/${String(chunks.length)} failed: ${String(e)}`);
+            }
+            if (i < chunks.length - 1) await new Promise((r) => setTimeout(r, 300));
           }
-          if (i < chunks.length - 1) await new Promise((r) => setTimeout(r, 300));
-        }
-        FluxLogger.timeEnd("thumbnail-fetch", "ServerBrowser");
-        FluxLogger.info("ServerBrowser", `Thumbnail map built: ${String(thumbnailMap.size)}/${String(allTokens.length)} player tokens resolved`);
-        if (allFetchedServers.length > 0) {
-          const firstServer = allFetchedServers[0];
-          if (firstServer !== void 0) {
-            const rawTokens = firstServer.playerTokens.slice(0, 6);
-            const tokenReport = rawTokens.map((t) => `${t.slice(0, 12)}...\u2192${thumbnailMap.has(t) ? "\u2713" : "\u2717"}`);
-            FluxLogger.info("ServerBrowser", `Token lookup sample (first server): [${tokenReport.join(", ")}]`);
+          FluxLogger.timeEnd("thumbnail-fetch", "ServerBrowser");
+          FluxLogger.info("ServerBrowser", `Thumbnail map built: ${String(thumbnailMap.size)}/${String(allTokens.length)} player tokens resolved`);
+          if (allFetchedServers.length > 0) {
+            const firstServer = allFetchedServers[0];
+            if (firstServer !== void 0) {
+              const rawTokens = firstServer.playerTokens.slice(0, 6);
+              const tokenReport = rawTokens.map((t) => `${t.slice(0, 12)}...\u2192${thumbnailMap.has(t) ? "\u2713" : "\u2717"}`);
+              FluxLogger.info("ServerBrowser", `Token lookup sample (first server): [${tokenReport.join(", ")}]`);
+            }
           }
+          const sampleServers = allFetchedServers.slice(0, 5);
+          const sampleReport = sampleServers.map((s) => {
+            const total = s.playerTokens.length;
+            const resolved = s.playerTokens.filter((t) => thumbnailMap.has(t)).length;
+            return `${String(total)} tokens \u2192 ${String(resolved)} thumbs`;
+          });
+          FluxLogger.info("ServerBrowser", `Token resolution sample: [${sampleReport.join("] [")}]`);
         }
-        const sampleServers = allFetchedServers.slice(0, 5);
-        const sampleReport = sampleServers.map((s) => {
-          const total = s.playerTokens.length;
-          const resolved = s.playerTokens.filter((t) => thumbnailMap.has(t)).length;
-          return `${String(total)} tokens \u2192 ${String(resolved)} thumbs`;
-        });
-        FluxLogger.info("ServerBrowser", `Token resolution sample: [${sampleReport.join("] [")}]`);
+        allServers = allFetchedServers.slice(0, selectedCount).map((s) => ({
+          id: s.id,
+          playing: s.playing,
+          maxPlayers: s.maxPlayers,
+          playerTokens: s.playerTokens,
+          thumbnails: s.playerTokens.slice(0, MAX_SLOTS).map((t) => thumbnailMap.get(t) ?? null).filter((x) => x !== null),
+          region: regionMap.get(s.id) ?? null
+        }));
+        const withRegion = allServers.filter((s) => s.region !== null).length;
+        const withoutRegion = allServers.length - withRegion;
+        FluxLogger.info("ServerBrowser", `Servers ready: ${String(allServers.length)} total (${String(withRegion)} with region, ${String(withoutRegion)} without)`);
+        regionScanDone = true;
+        const savedRegion = regionFilterAtom.get();
+        if (savedRegion) {
+          FluxLogger.info("ServerBrowser", `Applying saved region filter: "${savedRegion}"`);
+          applyRegionFilter(savedRegion);
+        } else {
+          FluxLogger.info("ServerBrowser", "No saved region filter, rendering all servers");
+          renderServerCards(allServers);
+        }
+        observeServerList();
+      } finally {
+        scanning = false;
       }
-      allServers = allFetchedServers.slice(0, 150).map((s) => ({
-        id: s.id,
-        playing: s.playing,
-        maxPlayers: s.maxPlayers,
-        playerTokens: s.playerTokens,
-        thumbnails: s.playerTokens.slice(0, MAX_SLOTS).map((t) => thumbnailMap.get(t) ?? null).filter((x) => x !== null),
-        region: regionMap.get(s.id) ?? null
-      }));
-      const withRegion = allServers.filter((s) => s.region !== null).length;
-      const withoutRegion = allServers.length - withRegion;
-      FluxLogger.info("ServerBrowser", `Servers ready: ${String(allServers.length)} total (${String(withRegion)} with region, ${String(withoutRegion)} without)`);
-      regionScanDone = true;
-      const savedRegion = regionFilterAtom.get();
-      if (savedRegion) {
-        FluxLogger.info("ServerBrowser", `Applying saved region filter: "${savedRegion}"`);
-        applyRegionFilter(savedRegion);
-      } else {
-        FluxLogger.info("ServerBrowser", "No saved region filter, rendering all servers");
-        renderServerCards(allServers);
-      }
-      observeServerList();
     }
     __name(scanAndCacheRegions, "scanAndCacheRegions");
     function renderServerCards(servers) {
@@ -2895,7 +2914,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
       FluxLogger.info("ServerBrowser", "Manual refresh triggered");
       allServers = [];
       regionScanDone = false;
-      void scanAndCacheRegions();
+      void scanAndCacheRegions(true);
     }
     __name(refreshServers, "refreshServers");
     function openFilterPanel() {
@@ -3042,6 +3061,7 @@ GM_addStyle(`/* === CSS Custom Properties === */
     let active = false;
     let activeTab = "games";
     let searchTimer = null;
+    let hideDropdownInterval = null;
     let abortController = null;
     function uuid() {
       return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -3263,12 +3283,16 @@ GM_addStyle(`/* === CSS Custom Properties === */
       input.addEventListener("keydown", (e) => {
         if (e.key === "Escape") hideOverlay();
       });
-      setInterval(hideRobloxDropdown, 200);
+      hideDropdownInterval = setInterval(hideRobloxDropdown, 200);
     }
     __name(start, "start");
     function stop() {
       if (!active) return;
       active = false;
+      if (hideDropdownInterval !== null) {
+        clearInterval(hideDropdownInterval);
+        hideDropdownInterval = null;
+      }
       if (overlay) {
         overlay.remove();
         overlay = null;

@@ -43,9 +43,15 @@ export const FluxFeatureAdRemover = ((): {
     for (const ad of ads) {
       const el = ad as HTMLElement;
       const prevDisplay = el.style.display;
+      const textSnippet = (el.textContent).trim().slice(0, 80) || '(no text)';
+      const dataAttrs = Array.from(el.attributes)
+        .filter(a => a.name.startsWith('data-'))
+        .map(a => `${a.name}=${JSON.stringify(a.value)}`)
+        .join(' ');
+      const extra = dataAttrs ? ` [${dataAttrs}]` : '';
       el.remove();
       removed++;
-      FluxLogger.debug('AdRemover', `Removed ad element: ${el.tagName}.${el.className.split(' ')[0] ?? '?'} (was ${prevDisplay || 'visible'})`);
+      FluxLogger.debug('AdRemover', `Removed ad element: ${el.tagName}.${el.className.split(' ')[0] ?? '?'} text="${textSnippet}"${extra} (was ${prevDisplay || 'visible'})`);
     }
 
     if (removed > 0) {

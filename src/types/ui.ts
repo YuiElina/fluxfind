@@ -43,13 +43,14 @@ export type IconName =
   | 'moon'
   | 'sun'
   | 'layout'
-  | 'pallete'
+  | 'palette'
   | 'monitor'
   | 'heart'
   | 'star'
   | 'clock'
   | 'shield'
-  | 'flag';
+  | 'flag'
+  | 'barChart';
 
 /** Options for rendering an icon */
 export interface IconOpts {

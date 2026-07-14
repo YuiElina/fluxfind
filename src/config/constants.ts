@@ -51,6 +51,7 @@ export const FluxConstants = ((): {
     togglefilterserversbutton: true, responsivegamecards: true, forcedarkmode: false,
     betterprivateservers: true, smartsearch: true, disablechat: false,
     smallerrobloxsidebar: false, autoserverregions: true, autoserverregionnumber: 16,
+    serverfetchcount: 150, serverregionfilter: '',
   };
 
   const URL_PATTERNS = {

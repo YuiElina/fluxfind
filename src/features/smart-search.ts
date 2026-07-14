@@ -26,6 +26,7 @@ export const FluxFeatureSmartSearch = ((): { start: () => void; stop: () => void
   let active = false;
   let activeTab: SearchTab = 'games';
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  let hideDropdownInterval: ReturnType<typeof setInterval> | null = null;
   let abortController: AbortController | null = null;
 
   function uuid(): string {
@@ -268,12 +269,13 @@ export const FluxFeatureSmartSearch = ((): { start: () => void; stop: () => void
     });
 
     // Periodically hide Roblox's dropdown
-    setInterval(hideRobloxDropdown, 200);
+    hideDropdownInterval = setInterval(hideRobloxDropdown, 200);
   }
 
   function stop(): void {
     if (!active) return;
     active = false;
+    if (hideDropdownInterval !== null) { clearInterval(hideDropdownInterval); hideDropdownInterval = null; }
     if (overlay) { overlay.remove(); overlay = null; dropdown = null; }
   }
 

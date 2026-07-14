@@ -31,9 +31,7 @@ export const FluxFeatureServerBrowser = ((): { init: () => Promise<void>; destro
   let scanning = false;
 
   function getMaxServerCount(): number {
-    const fromAtom = serverFetchCountAtom.get();
-    if (fromAtom > 0) return fromAtom;
-    return 150;
+    return serverFetchCountAtom.get();
   }
 
   async function scanAndCacheRegions(force = false): Promise<void> {
